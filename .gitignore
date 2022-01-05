@@ -1,7 +1,10 @@
 # -- in addition
 .idea/
-data/
-
+gt/
+input/
+gt_off/
+pred/
+*.pt
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -131,3 +134,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+data/Patches_noHole_and_collected.h5
