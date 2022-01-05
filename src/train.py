@@ -133,7 +133,8 @@ class PointCloudSuperResolutionTrainer:
                 val_loss = self.do_validate(val_dl)
                 if min_loss > val_loss:
                     min_loss = val_loss
-                    torch.save(self.model.state_dict(), os.path.join(self.args.output_root,'result_{}_{:.2f}.pt'.format(epoch, val_loss)))
+
+                torch.save(self.model.state_dict(), os.path.join(self.args.output_root,'result_{}_{:.2f}.pt'.format(epoch, val_loss)))
 
                 print('{} Epoch {}, Training loss {:.4f}, Val loss {:.2f} (Top performance :{:.2f})'.format(
                     datetime.datetime.now(), epoch, loss_train, val_loss, min_loss))
