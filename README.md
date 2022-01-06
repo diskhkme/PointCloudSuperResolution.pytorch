@@ -27,7 +27,10 @@ python predict_eval.py --weight-path=../trained/result_1_0.23.pt --predict-in-di
 
 ## Performance
 
-TBA
+|       |   CD    |   EMD    |
+|------:|:-------:|:--------:|
+| ResGCN|0.0089   |0.0033    |
+
 
 ### Contact
 hk.kim@jbnu.ac.kr

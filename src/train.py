@@ -28,8 +28,9 @@ class PointCloudSuperResolutionTrainer:
                             help='number of input points')
         parser.add_argument('--up-ratio', type=int, default=4,
                             help='up-sampling ratio')
-        parser.add_argument('--batch-size', type=int, default=6)
+        parser.add_argument('--batch-size', type=int, default=4)
         parser.add_argument('--nepochs', type=int, default=80)
+        parser.add_argument('--no-validate', action='store_true')
 
         self.args = parser.parse_args(sys_argv)
 
@@ -59,7 +60,7 @@ class PointCloudSuperResolutionTrainer:
     def init_dataloader(self, split='train'):
         if self.args.dataset == 'pu_net':
             dataset = PUNetDataset(self.args.dataset_root, npoints=self.args.lr_points, split=split,
-                                                            data_augmentation=True)
+                                                            data_augmentation=True, no_validate=self.args.no_validate)
         else:
             print("Other dataset is not suppored")
             return
@@ -122,7 +123,8 @@ class PointCloudSuperResolutionTrainer:
     def main(self):
         print('Starting {}, {}'.format(type(self).__name__, self.args))
         train_dl = self.init_dataloader('train')
-        val_dl = self.init_dataloader('val')
+        if not self.args.no_validate:
+            val_dl = self.init_dataloader('val')
         min_loss = 99999
         for epoch in range(1,self.args.nepochs + 1):
             loss_train = self.do_train(train_dl)
@@ -130,18 +132,18 @@ class PointCloudSuperResolutionTrainer:
             print('{} Epoch {}, Training loss {:.4f}'.format(datetime.datetime.now(), epoch, loss_train))
 
             if epoch == 1 or epoch % 10 == 0:
-                val_loss = self.do_validate(val_dl)
-                if min_loss > val_loss:
-                    min_loss = val_loss
 
-                torch.save(self.model.state_dict(), os.path.join(self.args.output_root,'result_{}_{:.2f}.pt'.format(epoch, val_loss)))
+                if not self.args.no_validate:
+                    val_loss = self.do_validate(val_dl)
+                    if min_loss > val_loss:
+                        min_loss = val_loss
+                        torch.save(self.model.state_dict(), os.path.join(self.args.output_root,'result_{}_{:.2f}.pt'.format(epoch, val_loss)))
 
-                print('{} Epoch {}, Training loss {:.4f}, Val loss {:.2f} (Top performance :{:.2f})'.format(
-                    datetime.datetime.now(), epoch, loss_train, val_loss, min_loss))
+                    print('{} Epoch {}, Training loss {:.4f}, Val loss {:.2f} (Top performance :{:.2f})'.format(
+                          datetime.datetime.now(), epoch, loss_train, val_loss, min_loss))
+                else:
+                    torch.save(self.model.state_dict(),
+                               os.path.join(self.args.output_root, 'result_{}_{:.2f}.pt'.format(epoch, loss_train)))
 
 if __name__ == '__main__':
     PointCloudSuperResolutionTrainer().main()
-
-    # --dataset=pu_net --dataset-root=../data/Patches_noHole_and_collected.h5  --output-root=../trained
-
-    # --weight-path=../trained/result_1_0.23.pt --predict-in-dir=../data/input --predict-out-dir=../data/pred --gt-dir=../data/gt

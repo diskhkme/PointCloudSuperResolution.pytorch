@@ -12,7 +12,8 @@ class PUNetDataset(data.Dataset):
                  npoints=1024,
                  split='train',
                  normalize=True,
-                 data_augmentation=True):
+                 data_augmentation=True,
+                 no_validate=True):
         self.npoints = npoints
         self.path = path
         self.split = split
@@ -20,25 +21,28 @@ class PUNetDataset(data.Dataset):
 
         f = h5py.File(self.path)
         self.gt = f['poisson_4096'][:]
+        self.gt = self.gt[:,:,:3]
         self.input_data = f['poisson_4096'][:]
+        self.input_data = self.input_data[:, :, :3]
         # data_1024 = f['montecarlo_1024'][:] # 1024 for test?
         self.names = f['name'][:]
         self.name_dict = self.generate_name_dict(self.names)
 
         # Further divide dataset into train & validation set
-        np.random.seed(0)
-        train_length = int(self.gt.shape[0] * 0.8)
-        model_indices = np.random.permutation(self.gt.shape[0])
-        train_indices = model_indices[:train_length]
-        val_indices = model_indices[train_length:]
-        if split == 'train':
-            self.gt = self.gt[train_indices, :, :3]
-            self.input_data = self.input_data[train_indices, :, :3]
-            self.names = self.names[train_indices]
-        elif split == 'val':
-            self.gt = self.gt[val_indices, :, :3]
-            self.input_data = self.input_data[val_indices, :, :3]
-            self.names = self.names[val_indices]
+        if not no_validate:
+            np.random.seed(0)
+            train_length = int(self.gt.shape[0] * 0.8)
+            model_indices = np.random.permutation(self.gt.shape[0])
+            train_indices = model_indices[:train_length]
+            val_indices = model_indices[train_length:]
+            if split == 'train':
+                self.gt = self.gt[train_indices, :, :]
+                self.input_data = self.input_data[train_indices, :, :]
+                self.names = self.names[train_indices]
+            elif split == 'val':
+                self.gt = self.gt[val_indices, :, :3]
+                self.input_data = self.input_data[val_indices, :, :]
+                self.names = self.names[val_indices]
 
         if normalize == True:
             print('Normalize data')
