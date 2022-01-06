@@ -4,10 +4,12 @@ import argparse
 import torch
 import torch.nn as nn
 import numpy as np
+import cv2
 from sklearn.neighbors import NearestNeighbors
 from pyemd import emd_samples
 
 from model.point_cloud_super_res import Generator
+from dataset.visualize.pc_visualization_util import point_cloud_three_views
 
 class PointCloudSuperResolutionEvaluation:
     def __init__(self, sys_argv=None):
@@ -44,7 +46,8 @@ class PointCloudSuperResolutionEvaluation:
 
     def prediction_whole_model(self):
         input_filename_list = os.listdir(self.args.predict_in_dir)
-        input_filepath_list = [os.path.join(self.args.predict_in_dir,x) for x in input_filename_list if x.find('.xyz') != -1]
+        input_filename_list = [x for x in input_filename_list if x.find('xyz') != -1]
+        input_filepath_list = [os.path.join(self.args.predict_in_dir,x) for x in input_filename_list]
 
         if not os.path.exists(self.args.predict_out_dir):
             os.mkdir(self.args.predict_out_dir)
@@ -81,6 +84,7 @@ class PointCloudSuperResolutionEvaluation:
         return np.squeeze(gt2pre), np.squeeze(pre2gt), emd_samples(gt_points, pre_points)
 
     def evaluate(self, filename_list):
+        filename_list = [x for x in filename_list if x.find('.xyz') != -1]
         distances = map(self.evaluate_single, filename_list)
         gt2pre, pre2gt, emd = zip(*distances)
         gt2pre, pre2gt = np.hstack(gt2pre), np.hstack(pre2gt)
@@ -107,9 +111,26 @@ class PointCloudSuperResolutionEvaluation:
             os.makedirs(os.path.split(path)[0])
         np.savetxt(path, points.squeeze(0).transpose(1,0))
 
+    def write_pc_image(self, pc_path):
+        points = np.loadtxt(pc_path)
+        im_array = point_cloud_three_views(points)
+        im_array = im_array * 255.0
+        out_path = pc_path.replace('.xyz','.jpg')
+        cv2.imwrite(out_path, im_array)
+
+    def visualize(self, filename_list):
+        for filename in filename_list:
+            gt_path = os.path.join(self.args.gt_dir, filename)
+            pre_path = os.path.join(self.args.predict_out_dir, filename)
+            input_path = os.path.join(self.args.predict_in_dir, filename)
+            self.write_pc_image(gt_path)
+            self.write_pc_image(pre_path)
+            self.write_pc_image(input_path)
+
     def main(self):
         filename_list = self.prediction_whole_model()
         self.evaluate(filename_list)
+        self.visualize(filename_list)
 
 if __name__ == '__main__':
     PointCloudSuperResolutionEvaluation().main()
