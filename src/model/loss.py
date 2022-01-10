@@ -11,6 +11,19 @@ def cd_loss(pred, gt, radius, alpha=1.0): # author proposed using alpha==1.0
 
     return cd_loss
 
+def finetune_gen_loss(d_fake, lambd, pred, gt, radius, alpha=1.0):
+    cd_loss_val = cd_loss(pred, gt, radius, alpha)
+    g_loss = torch.mean(d_fake**2, dim=2)
+
+    return g_loss + lambd * cd_loss_val
+
+def finetune_disc_loss(d_real, d_fake):
+    d_loss_real = torch.mean((d_real - 1)**2, dim=2)
+    d_loss_fake = torch.mean(d_fake**2, dim=2)
+    d_loss = 0.5 * (d_loss_real + d_loss_fake)
+
+    return d_loss
+
 if __name__ == '__main__':
     pred = torch.rand((1,3,1024))
     gt = torch.rand((1,3,1024))
