@@ -88,13 +88,13 @@ class ResGraphConvUnpool(nn.Module):
                 # Center Conv
                 points_xyz = self.unpool_center_conv(center_points) # (batch_size, 3*up_ratio, 1, num_points)
                 # Neighbor Conv
-                grouped_points_xyz = self.unpool_neighbor_conv(grouped_points) # (batch_size, 3*up_ratio, 8, num_points)
+                grouped_points_xyz = self.unpool_neighbor_conv(grouped_points) # (batch_size, 3*up_ratio, k, num_points)
                 # CNN
                 new_xyz = torch.mean(torch.cat((points_xyz, grouped_points_xyz), dim=2), dim=2) # (batch_size, 3*up_ratio, num_points)
                 new_xyz = new_xyz.view(-1, 3, self.up_ratio, num_points) # (batch_size, 3, up_ratio, num_points)
 
                 b, d, n = xyz.shape
-                new_xyz = new_xyz + xyz.view(b, d, 1, n).repeat(1, 1, self.up_ratio, 1)
+                new_xyz = new_xyz + xyz.view(b, d, 1, n).repeat(1, 1, self.up_ratio, 1) # add delta x to original xyz to upsample
                 new_xyz = new_xyz.view(-1, 3, self.up_ratio*num_points)
 
                 return new_xyz, points
@@ -125,7 +125,97 @@ class Generator(nn.Module):
 
         return xyz
 
-    # TODO: extend to AR-GCN with discriminator
+class ResGraphConvPool(nn.Module):
+    def __init__(self, k=8, feat_dim=64, dim=64, num_blocks=12, device=torch.device('cuda')):
+        super(ResGraphConvPool, self).__init__()
+        self.k = k
+        self.feat_dim = feat_dim
+        self.dim = dim
+        self.num_blocks = num_blocks
+        self.device = device
+
+        self.layers = nn.ModuleList()
+        for i in range(self.num_blocks):
+            if i == 1:
+                self.layers.append(nn.BatchNorm1d(self.feat_dim))
+                self.layers.append(nn.LeakyReLU())
+
+                self.layers.append(nn.Conv2d(self.feat_dim, self.dim, kernel_size=1, stride=1))
+                self.layers.append(nn.Conv2d(self.feat_dim, self.dim, kernel_size=1, stride=1))
+            else:
+                self.layers.append(nn.BatchNorm1d(self.dim))
+                self.layers.append(nn.LeakyReLU())
+
+                self.layers.append(nn.Conv2d(self.dim, self.dim, kernel_size=1, stride=1))
+                self.layers.append(nn.Conv2d(self.dim, self.dim, kernel_size=1, stride=1))
+
+    def forward(self, xyz, points):
+        # xyz: (batch_size, num_dim(3), num_points)
+        # points: (batch_size, num_dim(128), num_points)
+
+        indices = None
+        for idx in range(self.num_blocks): # 4 layers per iter
+            shortcut = points # (batch_size, num_dim(128), num_points)
+
+            points = self.layers[4 * idx](points) # Batch norm
+            points = self.layers[4 * idx + 1](points) # LeakyReLU
+
+            if idx == 0 and indices is None:
+                _, grouped_points, indices = gutil.group(xyz, points, self.k, self.device) # (batch_size, num_dim, k, num_points)
+            else:
+                grouped_points = gutil.group_point(points, indices,self.device)
+
+            # Center Conv
+            b, d, n = points.shape
+            center_points = points.view(b, d, 1, n)
+            points = self.layers[4 * idx + 2](center_points)  # (batch_size, num_dim(128), 1, num_points)
+            # Neighbor Conv
+            grouped_points_nn = self.layers[4 * idx + 2](grouped_points)
+            # CNN
+            points = torch.mean(torch.cat((points, grouped_points_nn), dim=2), dim=2) + shortcut
+
+        return points
+
+class ResGraphConvPoolLast(nn.Module):
+    def __init__(self, feat_dim=64, dim=1, device=torch.device('cuda')):
+        super(ResGraphConvPoolLast, self).__init__()
+
+        self.bn = nn.BatchNorm1d(feat_dim)
+        self.act = nn.LeakyReLU()
+        self.conv = nn.Conv2d(feat_dim, dim, kernel_size=1, stride=1)
+
+    def forward(self,x):
+        points = self.bn(x)
+        points = self.act(points)
+        b, d, n = points.shape
+        center_points = points.view(b, d, 1, n)
+        points = self.conv(center_points).squeeze(2)
+
+        return points
+
+class Discriminator(nn.Module):
+    def __init__(self, num_hr_points=4096, device=torch.device('cuda')):
+        super(Discriminator, self).__init__()
+        self.device = device
+        self.featurenet = FeatureNet(k=8,dim=64,num_blocks=2)
+        self.block_num = int(math.log2(num_hr_points/64)/2)
+
+        self.layers = nn.ModuleList()
+        for i in range(self.block_num):
+            self.layers.append(ResGraphConvPool(k=8, feat_dim=64, dim=64, num_blocks=12))
+
+        self.last_layer = ResGraphConvPoolLast(feat_dim=64, dim=1)
+
+    def forward(self,xyz):
+        points = self.featurenet(xyz)
+        for layer in self.layers:
+            xyz, points = gutil.pool(xyz, points, k=8, npoint=points.size(2)//4)
+            points = layer(xyz, points)
+
+        points = self.last_layer(points)
+
+        return points
+
 
 if __name__ == '__main__':
     device = torch.device('cuda')
@@ -154,5 +244,11 @@ if __name__ == '__main__':
     # new_xyz, points = res_gcn_unpool_2(new_xyz, points)
 
     # -- Generator Test
-    g = Generator(4).to(device)
-    xyz = g(xyz)
+    # g = Generator(4).to(device)
+    # xyz = g(xyz)
+
+    # -- Discriminator Test
+    device = torch.device('cuda')
+    up_sampled = torch.rand((3, 3, 4096)).to(device)
+    d = Discriminator().to(device)
+    res = d(up_sampled)

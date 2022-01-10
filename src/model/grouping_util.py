@@ -1,4 +1,5 @@
 import torch
+from torch_geometric.nn import fps
 
 # TODO: KNN requires too much memory ( num_points x num_points matrix )
 def knn_point(k, xyz1, xyz2):
@@ -22,6 +23,7 @@ def knn(x, k):
     return idx
 
 def group_point(x, idx, device):
+    # TODO: Device argument can be omiited by match idx_base with (x.device)
     k = idx.size(1)
     batch_size = x.size(0)
     num_input_points = x.size(2)
@@ -55,9 +57,28 @@ def group(xyz, points, k, device):
 
     return grouped_xyz, grouped_points, idx
 
+def pool(xyz, points, k, npoint):
+    b, d, n = xyz.shape
+    tr_xyz = xyz.transpose(1,2).contiguous().view(b*n, d)
+    batch = torch.arange(0, b).repeat_interleave(n).to(xyz.device)
+
+    sample_ratio = torch.tensor([npoint / n]).to(xyz.device)
+    index = fps(tr_xyz, batch=batch, ratio=sample_ratio)
+    tr_xyz_points = tr_xyz[index,:] # (b*npoint, d)
+    new_xyz = tr_xyz_points.view(b,npoint,d)
+    new_xyz = new_xyz.transpose(1,2).contiguous() # pooled points
+
+    _, idx = knn_point(k, xyz, new_xyz)
+    new_points, _ = torch.max(group_point(points, idx, xyz.device),dim=2)
+
+    return new_xyz, new_points
+
 
 if __name__ == '__main__':
-    x = torch.rand((1,3,1024))
-    y = torch.rand((1, 3, 1024))
+    x = torch.rand((2, 3, 1024)).to(torch.device('cuda'))
+    y = torch.rand((2, 128, 1024)).to(torch.device('cuda'))
 
-    knn(x,8)
+    # knn(x,8)
+    pool_ind = pool(x,y,8,512)
+
+    print(pool_ind)
