@@ -7,6 +7,7 @@ import torch.optim as optim
 import datetime
 from tqdm import tqdm
 
+
 from model.point_cloud_super_res import Generator, Discriminator
 from model.loss import cd_loss, finetune_gen_loss, finetune_disc_loss
 from dataset.pu_net_hdf import PUNetDataset
@@ -187,14 +188,14 @@ class PointCloudSuperResolutionTrainer:
                 loss_train = self.do_pre_train(train_dl)
                 print('{} Epoch {}, Pre-training loss {:.4f}'.format(datetime.datetime.now(), epoch, loss_train))
 
-                if epoch == int(self.args.nepochs * 0.8):
+                if epoch == 1 or epoch % 10 == 0:
                    torch.save(self.generator.state_dict(), os.path.join(self.args.output_root, 'result_{}_{:.2f}.pt'.format(epoch, loss_train)))
 
             # --- Fine-tune training
             else:
                 loss_g, loss_d = self.do_fine_train(train_dl)
                 print('{} Epoch {}, Fine-training loss gen:{:.4f} disc:{:.4f}'.format(datetime.datetime.now(), epoch, loss_g, loss_d))
-                if epoch == int(self.args.nepochs):
+                if epoch % 10 == 0 or epoch == int(self.args.nepochs):
                    torch.save(self.generator.state_dict(), os.path.join(self.args.output_root, 'result_{}_{:.2f}.pt'.format(epoch, loss_g)))
 
 if __name__ == '__main__':

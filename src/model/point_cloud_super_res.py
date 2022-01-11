@@ -117,7 +117,7 @@ class Generator(nn.Module):
         for i in range(self.num_block):
             new_xyz, points = self.layers[i](xyz, points)
             if i < self.num_block - 1:
-                _, idx = gutil.knn_point(8, xyz, new_xyz) # idx contains k nearest point of new_xyz in xyz
+                idx = gutil.knn_point(8, xyz, new_xyz) # idx contains k nearest point of new_xyz in xyz
                 grouped_points = gutil.group_point(points, idx, self.device)
                 points = torch.mean(grouped_points, dim=2)
 

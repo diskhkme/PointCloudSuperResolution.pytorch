@@ -1,8 +1,22 @@
 import torch
-from torch_geometric.nn import fps
+from torch_geometric.nn import fps, knn
 
-# TODO: KNN requires too much memory ( num_points x num_points matrix )
 def knn_point(k, xyz1, xyz2):
+    b1, d1, n1 = xyz1.shape # input
+    b2, d2, n2 = xyz2.shape # query
+
+    xyz1_tr = xyz1.transpose(1,2).contiguous().view(b1*n1, d1).contiguous()
+    xyz2_tr = xyz2.transpose(1,2).contiguous().view(b2*n2, d2).contiguous()
+    batch1 = torch.arange(0, b1).repeat_interleave(n1).to(xyz1.device)
+    batch2 = torch.arange(0, b2).repeat_interleave(n2).to(xyz2.device)
+
+    ind = knn(xyz1_tr, xyz2_tr, k, batch_x=batch1, batch_y=batch2) # (2, b2*n2*k)
+    ind_offset = torch.arange(0, b2).repeat_interleave(n2*k).to(xyz2.device) * n2
+    ret_ind = (ind[1, :]-ind_offset).view(b2, k, n2).contiguous()
+
+    return ret_ind
+
+def knn_point_dist(k, xyz1, xyz2):
     b1, d1, n1 = xyz1.shape
     xyz1 = xyz1.view(b1, d1, 1, n1)
     b2, d2, n2 = xyz2.shape
@@ -14,7 +28,7 @@ def knn_point(k, xyz1, xyz2):
 
     return torch.sqrt(-val), idx # TODO: remove sqrt
 
-def knn(x, k):
+def knn_old(x, k):
     inner = -2 * torch.matmul(x.transpose(2, 1), x)
     xx = torch.sum(x ** 2, dim=1, keepdim=True)
     pairwise_distance = -xx - inner - xx.transpose(2, 1)
@@ -45,7 +59,7 @@ def group_point(x, idx, device):
     return feature
 
 def group(xyz, points, k, device):
-    _, idx = knn_point(k, xyz, xyz)
+    idx = knn_point(k, xyz, xyz)
     grouped_xyz = group_point(xyz, idx, device) # (batch_size, num_dim, k, num_points)
     b,d,n = xyz.shape
     grouped_xyz -= xyz.view(b, d, 1, n).repeat(1, 1, k, 1) # translation normalization, (batch_size, num_points, k, num_dim(3))
@@ -68,7 +82,7 @@ def pool(xyz, points, k, npoint):
     new_xyz = tr_xyz_points.view(b,npoint,d)
     new_xyz = new_xyz.transpose(1,2).contiguous() # pooled points
 
-    _, idx = knn_point(k, xyz, new_xyz)
+    idx = knn_point(k, xyz, new_xyz)
     new_points, _ = torch.max(group_point(points, idx, xyz.device),dim=2)
 
     return new_xyz, new_points
@@ -79,6 +93,9 @@ if __name__ == '__main__':
     y = torch.rand((2, 128, 1024)).to(torch.device('cuda'))
 
     # knn(x,8)
-    pool_ind = pool(x,y,8,512)
+    # pool_ind = pool(x,y,8,512)
+    ind = knn_point(8,x,x)
+    print(ind)
+    ind = knn_point_dist(8,x,x)
 
-    print(pool_ind)
+    print(ind)

@@ -2,8 +2,8 @@ import torch
 import model.grouping_util as gutil
 
 def cd_loss(pred, gt, radius, alpha=1.0): # author proposed using alpha==1.0
-    forward, _ = gutil.knn_point(1, gt, pred) # for points in pred, get nearest point index in gt
-    backward, _ = gutil.knn_point(1, pred, gt)
+    forward, _ = gutil.knn_point_dist(1, gt, pred) # for points in pred, get nearest point index in gt
+    backward, _ = gutil.knn_point_dist(1, pred, gt)
     cd_dist = alpha*forward + (1.0-alpha)*backward
     cd_dist = torch.mean(cd_dist, dim=1)
     cd_dist_norm = cd_dist / radius
