@@ -17,7 +17,7 @@ class PointCloudSuperResolutionTrainer:
         if sys_argv is None:
             sys_argv = sys.argv[1:]
         parser = argparse.ArgumentParser()
-        parser.add_argument('--num-workers', type=int, default=4,
+        parser.add_argument('--num-workers', type=int, default=2,
                                  help='dataloader threads. 0 for single-thread.')
         parser.add_argument('--dataset', type=str,
                             help='pu_net')
@@ -30,6 +30,8 @@ class PointCloudSuperResolutionTrainer:
         parser.add_argument('--up-ratio', type=int, default=4,
                             help='up-sampling ratio')
         parser.add_argument('--batch-size', type=int, default=4)
+        parser.add_argument('--resume-from', type=str,
+                            help='resume train from the weight')
         parser.add_argument('--nepochs', type=int, default=100,
                             help='full epochs to train. 80% of epochs for pre-train, 20% for fine tune')
         parser.add_argument('--no-validate', action='store_true')
@@ -182,7 +184,14 @@ class PointCloudSuperResolutionTrainer:
         if not self.args.no_validate:
             val_dl = self.init_dataloader('val')
         min_loss = 99999
-        for epoch in range(1,self.args.nepochs + 1):
+
+        if self.args.resume_from is not None:
+            self.generator.load_state_dict(torch.load(self.args.resume_from, map_location=self.device))
+            start_epoch = int(os.path.basename(self.args.resume_from).split('_')[1])
+        else:
+            start_epoch = 1
+
+        for epoch in range(start_epoch,self.args.nepochs + 1):
             # --- Pre training generator
             if epoch <= int(self.args.nepochs * 0.8):
                 loss_train = self.do_pre_train(train_dl)
