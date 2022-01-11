@@ -5,13 +5,13 @@ def knn_point(k, xyz1, xyz2):
     b1, d1, n1 = xyz1.shape # input
     b2, d2, n2 = xyz2.shape # query
 
-    xyz1_tr = xyz1.transpose(1,2).contiguous().view(b1*n1, d1).contiguous()
-    xyz2_tr = xyz2.transpose(1,2).contiguous().view(b2*n2, d2).contiguous()
-    batch1 = torch.arange(0, b1).repeat_interleave(n1).to(xyz1.device)
-    batch2 = torch.arange(0, b2).repeat_interleave(n2).to(xyz2.device)
+    xyz1_tr = xyz1.transpose(1,2).contiguous().view(b1*n1, d1)
+    xyz2_tr = xyz2.transpose(1,2).contiguous().view(b2*n2, d2)
+    batch1 = torch.arange(0, b1, requires_grad=False).repeat_interleave(n1).to(xyz1.device)
+    batch2 = torch.arange(0, b2, requires_grad=False).repeat_interleave(n2).to(xyz2.device)
 
     ind = knn(xyz1_tr, xyz2_tr, k, batch_x=batch1, batch_y=batch2) # (2, b2*n2*k)
-    ind_offset = torch.arange(0, b2).repeat_interleave(n2*k).to(xyz2.device) * n2
+    ind_offset = torch.arange(0, b2, requires_grad=False).repeat_interleave(n2*k).to(xyz2.device) * n2
     ret_ind = (ind[1, :]-ind_offset).view(b2, k, n2).contiguous()
 
     return ret_ind
@@ -44,7 +44,7 @@ def group_point(x, idx, device):
     num_query_points = idx.size(2)
     x = x.view(batch_size, -1, num_input_points)
 
-    idx_base = torch.arange(0, batch_size).view(-1, 1, 1).to(device) * num_input_points
+    idx_base = torch.arange(0, batch_size, requires_grad=False).view(-1, 1, 1).to(device) * num_input_points
     idx_unpacked = idx + idx_base
     idx_unpacked = idx_unpacked.view(-1)
 
@@ -54,7 +54,7 @@ def group_point(x, idx, device):
     # (batch_size, num_points, num_dims)  -> (batch_size*num_points, num_dims) #   batch_size * num_points * k + range(0, batch_size*num_points)
     feature = x.view(batch_size * num_input_points, -1)[idx_unpacked, :]
     feature = feature.view(batch_size, num_query_points, k, num_dims)
-    feature = feature.transpose(1,3).contiguous() # (batch_size, num_dim, k, num_points)
+    feature = feature.transpose(1,3) # (batch_size, num_dim, k, num_points)
 
     return feature
 

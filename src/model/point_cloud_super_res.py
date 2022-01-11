@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import torch.autograd.profiler as profiler
 import math
 import model.grouping_util as gutil
 
@@ -66,22 +68,27 @@ class ResGraphConvUnpool(nn.Module):
         for idx in range(self.num_blocks): # 4 layers per iter
             shortcut = points # (batch_size, num_dim(128), num_points)
 
-            points = self.layers[4 * idx](points) # Batch norm
-            points = self.layers[4 * idx + 1](points) # ReLU
+            with profiler.record_function('Residual Graph Conv-Conv  {}'.format(idx)):
+                points = self.layers[4 * idx](points) # Batch norm
+                points = self.layers[4 * idx + 1](points) # ReLU
 
-            if idx == 0 and indices is None:
-                _, grouped_points, indices = gutil.group(xyz, points, self.k, self.device) # (batch_size, num_dim, k, num_points)
-            else:
-                grouped_points = gutil.group_point(points, indices,self.device)
+            with profiler.record_function('Residual Graph Conv-Group  {}'.format(idx)):
+                if idx == 0 and indices is None:
+                    _, grouped_points, indices = gutil.group(xyz, points, self.k, self.device) # (batch_size, num_dim, k, num_points)
+                else:
+                    grouped_points = gutil.group_point(points, indices, self.device)
 
-            # Center Conv
-            b,d,n = points.shape
-            center_points = points.view(b, d, 1, n)
-            points = self.layers[4 * idx + 2](center_points)  # (batch_size, num_dim(128), 1, num_points)
-            # Neighbor Conv
-            grouped_points_nn = self.layers[4 * idx + 2](grouped_points)
-            # CNN
-            points = torch.mean(torch.cat((points, grouped_points_nn), dim=2), dim=2) + shortcut
+            with profiler.record_function('Residual Graph Conv-Unpool {}'.format(idx)):
+                # Center Conv
+                b,d,n = points.shape
+                center_points = points.view(b, d, 1, n)
+                points = self.layers[4 * idx + 2](center_points)  # (batch_size, num_dim(128), 1, num_points)
+                # Neighbor Conv
+                grouped_points_nn = self.layers[4 * idx + 3](grouped_points)
+                # CNN
+                # points = torch.mean(torch.cat((points, grouped_points_nn), dim=2), dim=2) + shortcut
+                mean_g = torch.mean(grouped_points_nn, dim=2).unsqueeze(2)
+                points = (mean_g + (points-mean_g)/(grouped_points_nn.size(2) + 1)).squeeze(2) + shortcut
 
             if idx == self.num_blocks-1:
                 num_points = xyz.shape[-1]
@@ -113,13 +120,18 @@ class Generator(nn.Module):
             self.layers.append(ResGraphConvUnpool(k=8,feat_dim=128,dim=128,up_ratio=2,num_blocks=12,device=self.device))
 
     def forward(self, xyz):
-        points = self.featurenet(xyz) # (batch_size, feat_dim, num_points)
+        with profiler.record_function('FeatureNet'):
+            points = self.featurenet(xyz) # (batch_size, feat_dim, num_points)
+
         for i in range(self.num_block):
-            new_xyz, points = self.layers[i](xyz, points)
+            with profiler.record_function('Residual Graph Conv {}'.format(i)):
+                new_xyz, points = self.layers[i](xyz, points)
+
             if i < self.num_block - 1:
-                idx = gutil.knn_point(8, xyz, new_xyz) # idx contains k nearest point of new_xyz in xyz
-                grouped_points = gutil.group_point(points, idx, self.device)
-                points = torch.mean(grouped_points, dim=2)
+                with profiler.record_function('Unpooling'):
+                    idx = gutil.knn_point(8, xyz, new_xyz) # idx contains k nearest point of new_xyz in xyz
+                    grouped_points = gutil.group_point(points, idx, self.device)
+                    points = torch.mean(grouped_points, dim=2)
 
             xyz = new_xyz
 
@@ -218,37 +230,54 @@ class Discriminator(nn.Module):
 
 
 if __name__ == '__main__':
-    device = torch.device('cuda')
-    xyz = torch.rand((1,3,1024)).to(device)
+    # model =Generator(4)
+    # print(model)
 
-    # knn
-    # ind = knn(xyz, 8)
-    # val, ind2 = knn_point(8, xyz, xyz)
 
-    # -- Module Test
-    # k = 8
-    # feat_dim = 128
-    # num_feat_block = 3
-    #
-    # f = FeatureNet(k=k, dim=feat_dim, num_blocks=num_feat_block)
-    # points = f(xyz) # 1 x 128 x 1024
-    #
-    # num_res_gcn_block = 12
-    # res_gcn_dim = 128
-    # up_ratio = 2
-    #
-    # res_gcn_unpool_1 = ResGraphConvUnpool(k=k, feat_dim=feat_dim, dim=res_gcn_dim, up_ratio=up_ratio, num_blocks=num_res_gcn_block)
-    # new_xyz, points = res_gcn_unpool_1(xyz, points)
-    #
-    # res_gcn_unpool_2 = ResGraphConvUnpool(k=k, feat_dim=res_gcn_dim, dim=res_gcn_dim, up_ratio=up_ratio, num_blocks=num_res_gcn_block)
-    # new_xyz, points = res_gcn_unpool_2(new_xyz, points)
+    # Profile forward
+    model = Generator(4).cuda()
+    input = torch.rand(23, 3, 1024).cuda()
 
-    # -- Generator Test
-    # g = Generator(4).to(device)
-    # xyz = g(xyz)
+    model(input)
 
-    # -- Discriminator Test
-    device = torch.device('cuda')
-    up_sampled = torch.rand((3, 3, 4096)).to(device)
-    d = Discriminator().to(device)
-    res = d(up_sampled)
+    with profiler.profile(use_cuda=True, record_shapes=True, with_stack=True, profile_memory=True) as prof:
+        out = model(input)
+
+    print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cuda_memory_usage'))
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+
+
+    # device = torch.device('cuda')
+    # xyz = torch.rand((1,3,1024)).to(device)
+    #
+    # # knn
+    # # ind = knn(xyz, 8)
+    # # val, ind2 = knn_point(8, xyz, xyz)
+    #
+    # # -- Module Test
+    # # k = 8
+    # # feat_dim = 128
+    # # num_feat_block = 3
+    # #
+    # # f = FeatureNet(k=k, dim=feat_dim, num_blocks=num_feat_block)
+    # # points = f(xyz) # 1 x 128 x 1024
+    # #
+    # # num_res_gcn_block = 12
+    # # res_gcn_dim = 128
+    # # up_ratio = 2
+    # #
+    # # res_gcn_unpool_1 = ResGraphConvUnpool(k=k, feat_dim=feat_dim, dim=res_gcn_dim, up_ratio=up_ratio, num_blocks=num_res_gcn_block)
+    # # new_xyz, points = res_gcn_unpool_1(xyz, points)
+    # #
+    # # res_gcn_unpool_2 = ResGraphConvUnpool(k=k, feat_dim=res_gcn_dim, dim=res_gcn_dim, up_ratio=up_ratio, num_blocks=num_res_gcn_block)
+    # # new_xyz, points = res_gcn_unpool_2(new_xyz, points)
+    #
+    # # -- Generator Test
+    # # g = Generator(4).to(device)
+    # # xyz = g(xyz)
+    #
+    # # -- Discriminator Test
+    # device = torch.device('cuda')
+    # up_sampled = torch.rand((3, 3, 4096)).to(device)
+    # d = Discriminator().to(device)
+    # res = d(up_sampled)

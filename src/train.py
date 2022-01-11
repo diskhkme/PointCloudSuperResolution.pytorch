@@ -118,6 +118,7 @@ class PointCloudSuperResolutionTrainer:
             self.pre_optimizer.step()
 
             loss_train += loss.item()
+            # torch.cuda.empty_cache()
 
         return loss_train / num_batch
 
@@ -187,7 +188,7 @@ class PointCloudSuperResolutionTrainer:
 
         if self.args.resume_from is not None:
             self.generator.load_state_dict(torch.load(self.args.resume_from, map_location=self.device))
-            start_epoch = int(os.path.basename(self.args.resume_from).split('_')[1])
+            start_epoch = int(os.path.basename(self.args.resume_from).split('_')[1]) + 1
         else:
             start_epoch = 1
 
