@@ -136,8 +136,10 @@ class PointCloudSuperResolutionTrainer:
             if num_upsampled_points != gt_points.shape[2]:
                 gt_points = gt_points[:, :, :num_upsampled_points]
 
+            # Train G & D (TODO: is not the most efficient approach, I guess)
             # -- Train discriminator
-            pred_points = self.generator(input_points)
+            with torch.no_grad():
+                pred_points = self.generator(input_points)
 
             d_fake = self.discriminator(pred_points)
             d_real = self.discriminator(gt_points)
@@ -149,6 +151,11 @@ class PointCloudSuperResolutionTrainer:
             self.d_optimizer.step()
 
             # -- Train generator
+            pred_points = self.generator(input_points)
+
+            with torch.no_grad():
+                d_fake = self.discriminator(pred_points)
+
             g_loss = self.fine_gen_loss_fn(d_fake, 5000, pred_points, gt_points, 1.0)
 
             self.g_optimizer.zero_grad()

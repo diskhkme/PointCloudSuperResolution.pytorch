@@ -1,5 +1,9 @@
 import torch
+import os
 from torch_geometric.nn import fps, knn
+
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def knn_point(k, xyz1, xyz2):
     b1, d1, n1 = xyz1.shape # input
@@ -82,7 +86,7 @@ def pool(xyz, points, k, npoint):
     new_xyz = tr_xyz_points.view(b,npoint,d)
     new_xyz = new_xyz.transpose(1,2).contiguous() # pooled points
 
-    idx = knn_point(k, xyz, new_xyz)
+    _, idx = knn_point_dist(k, xyz, new_xyz)
     new_points, _ = torch.max(group_point(points, idx, xyz.device),dim=2)
 
     return new_xyz, new_points
