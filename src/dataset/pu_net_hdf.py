@@ -10,13 +10,10 @@ class PUNetDataset(data.Dataset):
     def __init__(self,
                  path,
                  npoints=1024,
-                 split='train',
                  normalize=True,
-                 data_augmentation=True,
-                 no_validate=True):
+                 data_augmentation=True):
         self.npoints = npoints
         self.path = path
-        self.split = split
         self.data_augmentation = data_augmentation
 
         f = h5py.File(self.path)
@@ -27,22 +24,6 @@ class PUNetDataset(data.Dataset):
         # data_1024 = f['montecarlo_1024'][:] # 1024 for test?
         self.names = f['name'][:]
         self.name_dict = self.generate_name_dict(self.names)
-
-        # Further divide dataset into train & validation set
-        if not no_validate:
-            np.random.seed(0)
-            train_length = int(self.gt.shape[0] * 0.8)
-            model_indices = np.random.permutation(self.gt.shape[0])
-            train_indices = model_indices[:train_length]
-            val_indices = model_indices[train_length:]
-            if split == 'train':
-                self.gt = self.gt[train_indices, :, :]
-                self.input_data = self.input_data[train_indices, :, :]
-                self.names = self.names[train_indices]
-            elif split == 'val':
-                self.gt = self.gt[val_indices, :, :3]
-                self.input_data = self.input_data[val_indices, :, :]
-                self.names = self.names[val_indices]
 
         if normalize == True:
             print('Normalize data')
@@ -83,20 +64,20 @@ class PUNetDataset(data.Dataset):
         batch_data_gt = np.expand_dims(self.gt[idx,:,:].copy(),0)
         radius = self.radius[idx]
 
-        if self.data_augmentation and self.split == 'train':
-            batch_input_data, batch_data_gt = self.rotate_point_cloud_and_gt(batch_input_data, batch_data_gt)
-            batch_input_data, batch_data_gt, scales = self.random_scale_point_cloud_and_gt(batch_input_data,
-                                                                                      batch_data_gt,
-                                                                                      scale_low=0.9,
-                                                                                      scale_high=1.1)
-            radius = radius * scales
-            batch_input_data, batch_data_gt = self.shift_point_cloud_and_gt(batch_input_data, batch_data_gt,
-                                                                       shift_range=0.1)
-            if np.random.rand() > 0.5:
-                batch_input_data = self.jitter_perturbation_point_cloud(batch_input_data, sigma=0.025, clip=0.05)
-            if np.random.rand() > 0.5:
-                batch_input_data = self.rotate_perturbation_point_cloud(batch_input_data, angle_sigma=0.03,
-                                                                       angle_clip=0.09)
+
+        batch_input_data, batch_data_gt = self.rotate_point_cloud_and_gt(batch_input_data, batch_data_gt)
+        batch_input_data, batch_data_gt, scales = self.random_scale_point_cloud_and_gt(batch_input_data,
+                                                                                  batch_data_gt,
+                                                                                  scale_low=0.9,
+                                                                                  scale_high=1.1)
+        radius = radius * scales
+        batch_input_data, batch_data_gt = self.shift_point_cloud_and_gt(batch_input_data, batch_data_gt,
+                                                                   shift_range=0.1)
+        if np.random.rand() > 0.5:
+            batch_input_data = self.jitter_perturbation_point_cloud(batch_input_data, sigma=0.025, clip=0.05)
+        if np.random.rand() > 0.5:
+            batch_input_data = self.rotate_perturbation_point_cloud(batch_input_data, angle_sigma=0.03,
+                                                                   angle_clip=0.09)
 
         batch_input_data = np.squeeze(batch_input_data, 0)
         batch_data_gt = np.squeeze(batch_data_gt, 0)

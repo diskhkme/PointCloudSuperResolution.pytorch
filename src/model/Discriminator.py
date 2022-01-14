@@ -65,25 +65,29 @@ class ResGraphConvPoolLast(nn.Module):
         points = self.act(points)
         b, d, n = points.shape
         center_points = points.view(b, d, 1, n)
-        points = self.conv(center_points).squeeze(2)
+        res = self.conv(center_points).squeeze(2)
 
-        return points
+        return res
 
 class Discriminator(nn.Module):
-    def __init__(self):
+    def __init__(self, cfg):
         super(Discriminator, self).__init__()
-        self.featurenet = FeatureNet(k=8,dim=64)
+        self.k = cfg['k']
+        self.feat_dim = cfg['feat_dim']
+        self.res_conv_dim = cfg['res_conv_dim']
+
+        self.featurenet = FeatureNet(k=self.k,dim=self.feat_dim)
 
         self.layers = nn.ModuleList()
         for i in range(3):
-            self.layers.append(ResGraphConvPool(k=8, feat_dim=64, dim=64))
+            self.layers.append(ResGraphConvPool(k=self.k, feat_dim=self.feat_dim, dim=self.res_conv_dim))
 
-        self.last_layer = ResGraphConvPoolLast(feat_dim=64, last_dim=1)
+        self.last_layer = ResGraphConvPoolLast(feat_dim=self.res_conv_dim, last_dim=1)
 
     def forward(self,xyz):
         points = self.featurenet(xyz)
         for layer in self.layers:
-            xyz, points = gutil.pool(xyz, points, k=8, npoint=points.size(2)//4)
+            xyz, points = gutil.pool(xyz, points, k=self.k, npoint=points.size(2)//4)
             points = layer(xyz, points)
 
         points = self.last_layer(points)
@@ -91,9 +95,9 @@ class Discriminator(nn.Module):
         return points
 
 if __name__ == '__main__':
-    xyz = torch.rand(16,3,4096).cuda()
-
-    d = Discriminator().cuda()
+    xyz = torch.rand(12,3,4096).cuda()
+    cfg = {'k': 8, 'feat_dim': 64, 'res_conv_dim': 64}
+    d = Discriminator(cfg).cuda()
     points = d(xyz)
 
     print(points.shape)

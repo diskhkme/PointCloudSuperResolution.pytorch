@@ -90,13 +90,15 @@ class ResGraphConvUnpool(nn.Module):
                 return new_xyz, points
 
 class Generator(nn.Module):
-    def __init__(self, k=9, feat_dim=128, res_conv_dim=128):
+    def __init__(self, cfg):
         super(Generator, self).__init__()
-        self.k = k
-        self.featurenet = FeatureNet(self.k, feat_dim)
+        self.k = cfg['k']
+        self.feat_dim = cfg['feat_dim']
+        self.res_conv_dim = cfg['res_conv_dim']
+        self.featurenet = FeatureNet(self.k, self.feat_dim)
 
-        self.res_unpool_1 = ResGraphConvUnpool(k, feat_dim, res_conv_dim)
-        self.res_unpool_2 = ResGraphConvUnpool(k, res_conv_dim, res_conv_dim)
+        self.res_unpool_1 = ResGraphConvUnpool(self.k, self.feat_dim, self.res_conv_dim)
+        self.res_unpool_2 = ResGraphConvUnpool(self.k, self.res_conv_dim, self.res_conv_dim)
 
     def forward(self, xyz):
         points = self.featurenet(xyz) # (batch_size, feat_dim, num_points)
@@ -112,9 +114,10 @@ class Generator(nn.Module):
         return new_xyz
 
 if __name__ == '__main__':
-
     # Profile forward
-    model = Generator().cuda()
+    cfg = {'k':8, 'feat_dim':128, 'res_conv_dim':128}
+
+    model = Generator(cfg).cuda()
     xyz = torch.rand(24, 3, 1024).cuda()
 
     new_xyz = model(xyz)
