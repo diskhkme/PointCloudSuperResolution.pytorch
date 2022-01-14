@@ -236,7 +236,7 @@ if __name__ == '__main__':
 
     # Profile forward
     model = Generator(4).cuda()
-    input = torch.rand(23, 3, 1024).cuda()
+    input = torch.rand(24, 3, 1024).cuda()
 
     model(input)
 

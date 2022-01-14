@@ -40,7 +40,7 @@ def knn_old(x, k):
     idx = pairwise_distance.topk(k=k, dim=-1)[1]  # (batch_size, num_points, k)
     return idx
 
-def group_point(x, idx, device):
+def group_point(x, idx):
     # TODO: Device argument can be omiited by match idx_base with (x.device)
     k = idx.size(1)
     batch_size = x.size(0)
@@ -48,7 +48,7 @@ def group_point(x, idx, device):
     num_query_points = idx.size(2)
     x = x.view(batch_size, -1, num_input_points)
 
-    idx_base = torch.arange(0, batch_size, requires_grad=False).view(-1, 1, 1).to(device) * num_input_points
+    idx_base = torch.arange(0, batch_size, requires_grad=False).view(-1, 1, 1).to(x.device) * num_input_points
     idx_unpacked = idx + idx_base
     idx_unpacked = idx_unpacked.view(-1)
 
@@ -62,14 +62,14 @@ def group_point(x, idx, device):
 
     return feature
 
-def group(xyz, points, k, device):
+def group(xyz, points, k):
     idx = knn_point(k, xyz, xyz)
-    grouped_xyz = group_point(xyz, idx, device) # (batch_size, num_dim, k, num_points)
+    grouped_xyz = group_point(xyz, idx) # (batch_size, num_dim, k, num_points)
     b,d,n = xyz.shape
     grouped_xyz -= xyz.view(b, d, 1, n).repeat(1, 1, k, 1) # translation normalization, (batch_size, num_points, k, num_dim(3))
 
     if points is not None:
-        grouped_points = group_point(points, idx, device)
+        grouped_points = group_point(points, idx)
     else:
         grouped_points = grouped_xyz
 
@@ -87,7 +87,7 @@ def pool(xyz, points, k, npoint):
     new_xyz = new_xyz.transpose(1,2).contiguous() # pooled points
 
     _, idx = knn_point_dist(k, xyz, new_xyz)
-    new_points, _ = torch.max(group_point(points, idx, xyz.device),dim=2)
+    new_points, _ = torch.max(group_point(points, idx),dim=2)
 
     return new_xyz, new_points
 

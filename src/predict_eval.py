@@ -8,7 +8,7 @@ import cv2
 from sklearn.neighbors import NearestNeighbors
 from pyemd import emd_samples
 
-from model.point_cloud_super_res import Generator
+from model.point_cloud_super_res_simple import Generator
 from dataset.visualize.pc_visualization_util import point_cloud_three_views
 
 class PointCloudSuperResolutionEvaluation:
@@ -24,8 +24,6 @@ class PointCloudSuperResolutionEvaluation:
                             help='directory to save prediction result. (xyz format, 20,000 points per model in paper)')
         parser.add_argument('--gt-dir', type=str,
                             help='directory where gt files(.xyz) exist')
-        parser.add_argument('--up-ratio', type=int, default=4,
-                            help='number of points')
 
         self.args = parser.parse_args(sys_argv)
 
@@ -36,7 +34,7 @@ class PointCloudSuperResolutionEvaluation:
         self.model = self.init_model()
 
     def init_model(self):
-        model = Generator(self.args.up_ratio)
+        model = Generator()
         if self.use_cuda:
             print("Using CUDA; {} devices.".format(torch.cuda.device_count()))
             if torch.cuda.device_count() > 1:
