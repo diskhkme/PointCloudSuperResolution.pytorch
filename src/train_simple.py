@@ -7,8 +7,8 @@ import torch.optim as optim
 import datetime
 from tqdm import tqdm
 
-from model.point_cloud_super_res_simple import Generator
-from model.loss_simple import cd_loss
+from model.Generator import Generator
+from model.loss import cd_loss
 from dataset.pu_net_hdf import PUNetDataset
 
 class PointCloudSuperResolutionTrainer:

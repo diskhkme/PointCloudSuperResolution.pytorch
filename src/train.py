@@ -8,8 +8,8 @@ import datetime
 from tqdm import tqdm
 
 
-from model.point_cloud_super_res import Generator, Discriminator
-from model.loss import cd_loss, finetune_gen_loss, finetune_disc_loss
+from model._bak.point_cloud_super_res_bak import Generator, Discriminator
+from model._bak.loss_bak import cd_loss, finetune_gen_loss, finetune_disc_loss
 from dataset.pu_net_hdf import PUNetDataset
 
 class PointCloudSuperResolutionTrainer:

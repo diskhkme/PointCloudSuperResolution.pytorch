@@ -1,9 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.autograd.profiler as profiler
-import math
-import model.grouping_util_simple as gutil
+import model.grouping_util as gutil
 
 class FeatureNet(nn.Module):
     def __init__(self, k=8, dim=128):
@@ -92,19 +90,20 @@ class ResGraphConvUnpool(nn.Module):
                 return new_xyz, points
 
 class Generator(nn.Module):
-    def __init__(self):
+    def __init__(self, k=9, feat_dim=128, res_conv_dim=128):
         super(Generator, self).__init__()
-        self.featurenet = FeatureNet(k=8,dim=128)
+        self.k = k
+        self.featurenet = FeatureNet(self.k, feat_dim)
 
-        self.res_unpool_1 = ResGraphConvUnpool(8, 128, 128)
-        self.res_unpool_2 = ResGraphConvUnpool(8, 128, 128)
+        self.res_unpool_1 = ResGraphConvUnpool(k, feat_dim, res_conv_dim)
+        self.res_unpool_2 = ResGraphConvUnpool(k, res_conv_dim, res_conv_dim)
 
     def forward(self, xyz):
         points = self.featurenet(xyz) # (batch_size, feat_dim, num_points)
 
         new_xyz, points = self.res_unpool_1(xyz, points)
 
-        _, idx = gutil.knn_point(8, xyz, new_xyz)  # idx contains k nearest point of new_xyz in xyz
+        _, idx = gutil.knn_point(self.k, xyz, new_xyz)  # idx contains k nearest point of new_xyz in xyz
         grouped_points = gutil.group_point(points, idx)
         points = torch.mean(grouped_points, dim=2)
 

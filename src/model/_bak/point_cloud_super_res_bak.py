@@ -1,9 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.autograd.profiler as profiler
 import math
-import model.grouping_util as gutil
+import model._bak.grouping_util_bak as gutil
 
 class FeatureNet(nn.Module):
     def __init__(self, k=8, dim=128, num_blocks=3, device=torch.device('cuda')):

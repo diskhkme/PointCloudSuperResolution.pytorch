@@ -8,7 +8,7 @@ import cv2
 from sklearn.neighbors import NearestNeighbors
 from pyemd import emd_samples
 
-from model.point_cloud_super_res_simple import Generator
+from model.Generator import Generator
 from dataset.visualize.pc_visualization_util import point_cloud_three_views
 
 class PointCloudSuperResolutionEvaluation:
