@@ -74,6 +74,7 @@ class PointCloudSuperResolutionTrainer:
             self.discriminator.train()
 
         for i, (input, label, gt) in enumerate(tqdm(train_dl)):
+            torch.cuda.empty_cache()
             input_points = input.cuda()
             gt_points = gt.cuda()
             gt_points = self.clip_gt_points(input_points.size(2)*4, gt_points) # 4=upsample ratio
@@ -82,14 +83,14 @@ class PointCloudSuperResolutionTrainer:
 
             if phase == 'gan':
                 d_real = self.discriminator(gt_points)
-                torch.cuda.empty_cache()
+                # torch.cuda.empty_cache()
 
             pred_points = self.generator(input_points)
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
 
             if phase == 'gan':
                 d_fake = self.discriminator(pred_points.detach())
-                torch.cuda.empty_cache()
+                # torch.cuda.empty_cache()
 
             cd_loss = get_cd_loss(pred_points, gt_points, 1.0)
 
@@ -104,6 +105,7 @@ class PointCloudSuperResolutionTrainer:
             pre_gen_loss = cd_loss
             if phase == 'gan':
                 d_fake = self.discriminator(pred_points)
+                # torch.cuda.empty_cache()
                 g_loss = get_g_loss(d_fake)
                 pre_gen_loss = g_loss + self.cfg['loss']['lambd'] * pre_gen_loss
 
@@ -121,7 +123,13 @@ class PointCloudSuperResolutionTrainer:
         print('Starting {}, {}'.format(type(self).__name__, self.cfg))
         train_dl = self.init_dataloader()
 
-        for epoch in range(1,self.cfg['max_epoch'] + 1):
+        start_epoch = 1
+        if self.cfg['resume_from']:
+            start_epoch = int(os.path.basename(self.cfg['resume_from']).split('_')[1]) + 1
+            self.generator.load_state_dict(torch.load(self.cfg['resume_from'], map_location=torch.device('cuda')))
+            # TODO: add gen + desc load case
+
+        for epoch in range(start_epoch,self.cfg['max_epoch'] + 1):
             # --- Pre training epochs
             if epoch <= self.cfg['pretrain_epoch']:
                 pretrain_loss, _, _ = self.do_train(train_dl, 'pretrain')
@@ -132,6 +140,8 @@ class PointCloudSuperResolutionTrainer:
 
             if epoch == 1 or epoch % 10 == 0:
                torch.save(self.generator.state_dict(), os.path.join(self.cfg['ckpt_root'], 'result_{}_{:.6f}.pt'.format(epoch, pretrain_loss)))
+               torch.save(self.discriminator.state_dict(),
+                          os.path.join(self.cfg['ckpt_root'], 'result_{}_{:.6f}_desc.pt'.format(epoch, pretrain_loss)))
 
 if __name__ == '__main__':
     PointCloudSuperResolutionTrainer('config/train_config.yaml').main()

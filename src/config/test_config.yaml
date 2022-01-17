@@ -1,0 +1,21 @@
+# CUDA
+cuda_devices: '0'   # multi-gpu training is available
+
+# Network
+network:
+  generator:
+    k: 8
+    feat_dim: 128
+    res_conv_dim: 128
+  discriminator: # discriminator is not used in test/evaluation
+    k: 8
+    feat_dim: 64
+    res_conv_dim: 64
+
+# Test dataset
+dataset:
+  input_dir: '../data/input'
+  gt_dir: '../data/gt'
+  pred_dir: '../data/pred'
+
+load_model: '../ckpt/AR_GCN/AR_GCN_bak/result_100_0.117678.pt'

@@ -8,49 +8,36 @@ import cv2
 from sklearn.neighbors import NearestNeighbors
 from pyemd import emd_samples
 
+from config.config import get_test_config
 from model.Generator import Generator
 from dataset.visualize.pc_visualization_util import point_cloud_three_views
 
 class PointCloudSuperResolutionEvaluation:
-    def __init__(self, sys_argv=None):
-        if sys_argv is None:
-            sys_argv = sys.argv[1:]
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--weight-path', type=str,
-                            help='trained weight path')
-        parser.add_argument('--predict-in-dir', type=str,
-                            help='predict directory where input points (xyz format, 5,000 points per model in paper) exists')
-        parser.add_argument('--predict-out-dir', type=str,
-                            help='directory to save prediction result. (xyz format, 20,000 points per model in paper)')
-        parser.add_argument('--gt-dir', type=str,
-                            help='directory where gt files(.xyz) exist')
-
-        self.args = parser.parse_args(sys_argv)
-
-        #--
-        self.use_cuda = torch.cuda.is_available()
-        self.device = torch.device('cuda' if self.use_cuda else 'cpu')
+    def __init__(self, config_path):
+        self.cfg = get_test_config(config_path)
+        os.environ['CUDA_VISIBLE_DEVICES'] = self.cfg['cuda_devices']
 
         self.model = self.init_model()
+        self.input_dir = self.cfg['dataset']['input_dir']
+        self.gt_dir = self.cfg['dataset']['gt_dir']
+        self.pred_dir = self.cfg['dataset']['pred_dir']
 
     def init_model(self):
-        model = Generator()
-        if self.use_cuda:
-            print("Using CUDA; {} devices.".format(torch.cuda.device_count()))
-            if torch.cuda.device_count() > 1:
-                model = nn.DataParallel(model)
-            model = model.to(self.device)
-            return model
+        model = Generator(self.cfg['network']['generator'])
+        if torch.cuda.device_count() > 1:
+            model = nn.DataParallel(model)
+        model = model.cuda()
+        return model
 
     def prediction_whole_model(self):
-        input_filename_list = os.listdir(self.args.predict_in_dir)
+        input_filename_list = os.listdir(self.input_dir)
         input_filename_list = [x for x in input_filename_list if x.find('xyz') != -1]
-        input_filepath_list = [os.path.join(self.args.predict_in_dir,x) for x in input_filename_list]
+        input_filepath_list = [os.path.join(self.input_dir,x) for x in input_filename_list]
 
-        if not os.path.exists(self.args.predict_out_dir):
-            os.mkdir(self.args.predict_out_dir)
+        if not os.path.exists(self.pred_dir):
+            os.mkdir(self.pred_dir)
 
-        self.model.load_state_dict(torch.load(self.args.weight_path, map_location=self.device))
+        self.model.load_state_dict(torch.load(self.cfg['load_model'], map_location=torch.device('cuda')))
         with torch.no_grad():
             self.model.eval()
             for filepath, filename in zip(input_filepath_list, input_filename_list):
@@ -58,18 +45,18 @@ class PointCloudSuperResolutionEvaluation:
                 input = np.loadtxt(filepath)
                 input = np.expand_dims(input, axis=0)
                 input = input[:,:,:3]
-                input = torch.from_numpy(input.astype(np.float32)).to(self.device).transpose(1,2).contiguous()
+                input = torch.from_numpy(input.astype(np.float32)).cuda().transpose(1,2).contiguous()
 
                 output = self.model(input)
-                self.save_xyz(os.path.join(self.args.predict_out_dir, filename), output.detach().cpu().numpy())
+                self.save_xyz(os.path.join(self.pred_dir, filename), output.detach().cpu().numpy())
 
         return input_filename_list
 
     # https://github.com/wuhuikai/PointCloudSuperResolution/blob/master/evaluation_code/evaluation_cd.py
 
     def evaluate_single(self, filename):
-        gt_path = os.path.join(self.args.gt_dir, filename)
-        pre_path = os.path.join(self.args.predict_out_dir, filename)
+        gt_path = os.path.join(self.gt_dir, filename)
+        pre_path = os.path.join(self.pred_dir, filename)
         assert os.path.exists(gt_path)
         assert os.path.exists(pre_path)
 
@@ -116,11 +103,11 @@ class PointCloudSuperResolutionEvaluation:
         out_path = pc_path.replace('.xyz','.jpg')
         cv2.imwrite(out_path, im_array)
 
-    def visualize(self, filename_list):
+    def write_prdicted_images(self, filename_list):
         for filename in filename_list:
-            gt_path = os.path.join(self.args.gt_dir, filename)
-            pre_path = os.path.join(self.args.predict_out_dir, filename)
-            input_path = os.path.join(self.args.predict_in_dir, filename)
+            gt_path = os.path.join(self.gt_dir, filename)
+            pre_path = os.path.join(self.pred_dir, filename)
+            input_path = os.path.join(self.input_dir, filename)
             self.write_pc_image(gt_path)
             self.write_pc_image(pre_path)
             self.write_pc_image(input_path)
@@ -128,8 +115,8 @@ class PointCloudSuperResolutionEvaluation:
     def main(self):
         filename_list = self.prediction_whole_model()
         self.evaluate(filename_list)
-        self.visualize(filename_list)
+        self.write_prdicted_images(filename_list)
 
 if __name__ == '__main__':
-    PointCloudSuperResolutionEvaluation().main()
+    PointCloudSuperResolutionEvaluation('config/test_config.yaml').main()
 
