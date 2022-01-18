@@ -43,6 +43,8 @@ python test.py # refer 'src/config/test_config.yaml' for test settings
 - Prediction
 ![Pred](./img/camel_pred.jpg)
 
+## Issues
+- On training AR-GCN full model, reducing LR to a 1/10 rate is required. (Current result is from using the same LR.)
 
 ### Contact
 hk.kim@jbnu.ac.kr

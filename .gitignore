@@ -4,6 +4,9 @@ gt/
 input/
 gt_off/
 pred/
+trained/
+results/
+_bak/
 *.pt
 # Byte-compiled / optimized / DLL files
 __pycache__/
