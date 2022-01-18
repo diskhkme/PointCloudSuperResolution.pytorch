@@ -18,4 +18,4 @@ dataset:
   gt_dir: '../data/gt'
   pred_dir: '../data/pred'
 
-load_model: '../ckpt/AR_GCN/AR_GCN_bak/result_100_0.117678.pt'
+load_model: '../ckpt/AR_GCN/result_120_0.131922.pt'

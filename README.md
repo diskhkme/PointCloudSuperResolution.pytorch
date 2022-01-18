@@ -2,7 +2,9 @@
 
 This repository is implementation of AR-GCN(https://arxiv.org/abs/1908.02111) from "Point Cloud Super Resolution with Adversarial Residual Graph Networks" in Pytorch. You can find official Tensorflow implementation [here](https://github.com/wuhuikai/PointCloudSuperResolution).
 
-The model is in `src/model/point_cloud_super_res.py` (Currently, only generator network implemented.)
+The model is in `src/model/Generator.py` & `src/model/Discriminator.py`
+
+For further reduce training time, you can borrow CUDA implementation of KNN & Farthest point sampling from such as [PYG](https://github.com/pyg-team/pytorch_geometric)
 
 ## Note
 
@@ -15,14 +17,14 @@ You can download training patches in HDF5 format in [here](https://drive.google.
 (Note that the link is not maintained by me. Please refere [PU-Net](https://github.com/yulequan/PU-Net) official repository for the dataset.)
 ```buildoutcfg
 cd src
-python train.py --dataset=pu_net --dataset-root=../data/Patches_noHole_and_collected.h5  --output-root=../trained
+python train.py # refer 'src/config/train_config.yaml' for training settings
 ```
 
 ### Prediction and Evaluation
 You can download evaluation data from author's [official repository](https://github.com/wuhuikai/PointCloudSuperResolution).
 ```buildoutcfg
 cd src
-python predict_eval.py --weight-path=../trained/result_1_0.23.pt --predict-in-dir=../data/input --predict-out-dir=../data/pred --gt-dir=../data/gt
+python test.py # refer 'src/config/test_config.yaml' for test settings
 ```
 
 ## Performance
@@ -30,7 +32,17 @@ python predict_eval.py --weight-path=../trained/result_1_0.23.pt --predict-in-di
 |       |   CD    |   EMD    |
 |------:|:-------:|:--------:|
 | ResGCN|0.0111   |0.0039    |
-| AR-GCN|0.0088   |0.0033    |
+| AR-GCN|0.0107   |0.0034    |
+
+### Prediction example
+
+- Ground truth
+![GT](./img/camel_gt.jpg)
+- Input
+![Input](./img/camel_input.jpg)
+- Prediction
+![Pred](./img/camel_pred.jpg)
+
 
 ### Contact
 hk.kim@jbnu.ac.kr
