@@ -122,13 +122,7 @@ class PointCloudSuperResolutionEvaluation:
         input_filepath_list, input_filename_list = self.get_file_list(self.input_dir)
         gt_filepath_list, gt_filename_list = self.get_file_list(self.gt_dir)
 
-        num_calc = 100
-        input_filepath_list = input_filepath_list[:num_calc]
-        input_filename_list = input_filename_list[:num_calc]
-        gt_filepath_list = gt_filepath_list[:num_calc]
-        gt_filename_list = gt_filename_list[:num_calc]
-
-        # self.prediction_whole_model(input_filepath_list, input_filename_list)
+        self.prediction_whole_model(input_filepath_list, input_filename_list)
         self.evaluate(input_filename_list, gt_filename_list)
         self.write_prdicted_images(input_filename_list, gt_filename_list)
 
