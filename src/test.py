@@ -29,11 +29,14 @@ class PointCloudSuperResolutionEvaluation:
         model = model.cuda()
         return model
 
-    def prediction_whole_model(self):
-        input_filename_list = os.listdir(self.input_dir)
-        input_filename_list = [x for x in input_filename_list if x.find('xyz') != -1]
-        input_filepath_list = [os.path.join(self.input_dir,x) for x in input_filename_list]
+    def get_file_list(self, dir):
+        filename_list = os.listdir(dir)
+        filename_list = [x for x in filename_list if x.find('xyz') != -1]
+        filepath_list = [os.path.join(dir, x) for x in filename_list]
 
+        return filepath_list, filename_list
+
+    def prediction_whole_model(self, input_filepath_list, input_filename_list):
         if not os.path.exists(self.pred_dir):
             os.mkdir(self.pred_dir)
 
@@ -50,13 +53,15 @@ class PointCloudSuperResolutionEvaluation:
                 output = self.model(input)
                 self.save_xyz(os.path.join(self.pred_dir, filename), output.detach().cpu().numpy())
 
-        return input_filename_list
 
     # https://github.com/wuhuikai/PointCloudSuperResolution/blob/master/evaluation_code/evaluation_cd.py
 
-    def evaluate_single(self, filename):
-        gt_path = os.path.join(self.gt_dir, filename)
-        pre_path = os.path.join(self.pred_dir, filename)
+    def evaluate_single(self, filename, gt_filename):
+        # ABC Dataset adaptation
+        assert filename.split('_')[0] == gt_filename.split('_')[0]
+
+        gt_path = os.path.join(self.gt_dir, gt_filename)
+        pre_path = os.path.join(self.pred_dir, filename) # pred always has the same filename with input
         assert os.path.exists(gt_path)
         assert os.path.exists(pre_path)
 
@@ -68,9 +73,10 @@ class PointCloudSuperResolutionEvaluation:
 
         return np.squeeze(gt2pre), np.squeeze(pre2gt), emd_samples(gt_points, pre_points)
 
-    def evaluate(self, filename_list):
+    def evaluate(self, filename_list, gt_filename_list):
         filename_list = [x for x in filename_list if x.find('.xyz') != -1]
-        distances = map(self.evaluate_single, filename_list)
+        gt_filename_list = [x for x in gt_filename_list if x.find('.xyz') != -1]
+        distances = map(self.evaluate_single, filename_list, gt_filename_list)
         gt2pre, pre2gt, emd = zip(*distances)
         gt2pre, pre2gt = np.hstack(gt2pre), np.hstack(pre2gt)
         print('GT  --> PRE')
@@ -103,9 +109,9 @@ class PointCloudSuperResolutionEvaluation:
         out_path = pc_path.replace('.xyz','.jpg')
         cv2.imwrite(out_path, im_array)
 
-    def write_prdicted_images(self, filename_list):
-        for filename in filename_list:
-            gt_path = os.path.join(self.gt_dir, filename)
+    def write_prdicted_images(self, filename_list, gt_filename_list):
+        for filename, gt_filename in zip(filename_list, gt_filename_list):
+            gt_path = os.path.join(self.gt_dir, gt_filename)
             pre_path = os.path.join(self.pred_dir, filename)
             input_path = os.path.join(self.input_dir, filename)
             self.write_pc_image(gt_path)
@@ -113,9 +119,18 @@ class PointCloudSuperResolutionEvaluation:
             self.write_pc_image(input_path)
 
     def main(self):
-        filename_list = self.prediction_whole_model()
-        self.evaluate(filename_list)
-        self.write_prdicted_images(filename_list)
+        input_filepath_list, input_filename_list = self.get_file_list(self.input_dir)
+        gt_filepath_list, gt_filename_list = self.get_file_list(self.gt_dir)
+
+        num_calc = 100
+        input_filepath_list = input_filepath_list[:num_calc]
+        input_filename_list = input_filename_list[:num_calc]
+        gt_filepath_list = gt_filepath_list[:num_calc]
+        gt_filename_list = gt_filename_list[:num_calc]
+
+        # self.prediction_whole_model(input_filepath_list, input_filename_list)
+        self.evaluate(input_filename_list, gt_filename_list)
+        self.write_prdicted_images(input_filename_list, gt_filename_list)
 
 if __name__ == '__main__':
     PointCloudSuperResolutionEvaluation('config/test_config.yaml').main()

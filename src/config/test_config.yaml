@@ -14,8 +14,8 @@ network:
 
 # Test dataset
 dataset:
-  input_dir: '../data/input'
-  gt_dir: '../data/gt'
-  pred_dir: '../data/pred'
+  input_dir: 'D:/Test_Models/3D/ABC/220112_ABC_0000/abc_0000_point/low'
+  gt_dir: 'D:/Test_Models/3D/ABC/220112_ABC_0000/abc_0000_point/high'
+  pred_dir: 'D:/Test_Models/3D/ABC/220112_ABC_0000/abc_0000_point/pred'
 
 load_model: '../ckpt/AR_GCN/result_120_0.131922.pt'
