@@ -72,6 +72,8 @@ class PointCloudSuperResolutionTrainer:
         self.generator.train()
         if phase == 'gan':
             self.discriminator.train()
+            for g in self.pre_gen_optim.param_groups:
+                g['lr'] = self.cfg['finetune_lr']
 
         for i, (input, label, gt) in enumerate(tqdm(train_dl)):
             torch.cuda.empty_cache()

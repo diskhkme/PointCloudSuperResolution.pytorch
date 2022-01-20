@@ -26,9 +26,10 @@ loss:
 
 # train
 seed: 0
-resume_from: '../ckpt/AR_GCN/result_80_0.000022.pt'
+resume_from:
 optimizer: 'adam' # adam
 lr: 0.001
+finetune_lr: 0.0001
 momentum: 0.9
 weight_decay: 0.00001
 batch_size: 10
