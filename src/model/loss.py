@@ -2,9 +2,9 @@ import torch
 import model.grouping_util as gutil
 
 def get_cd_loss(pred, gt, radius, alpha=1.0): # author proposed using alpha==1.0
-    forward = gutil.pairwise_dist(pred, gt) # for points in pred, get nearest point index in gt
+    forward = gutil.pairwise_dist(gt, pred) # for points in pred, get nearest point index in gt
     if alpha != 1.0:
-        backward = gutil.pairwise_dist(gt, pred)
+        backward = gutil.pairwise_dist(pred, gt)
     else:
         backward = 0
 

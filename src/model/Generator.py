@@ -16,6 +16,13 @@ class FeatureNet(nn.Module):
         self.bn2 = nn.BatchNorm2d(dim)
         self.bn3 = nn.BatchNorm2d(dim)
 
+        self.init_layer()
+
+    def init_layer(self):
+        torch.nn.init.xavier_normal_(self.conv1.weight)
+        torch.nn.init.xavier_normal_(self.conv2.weight)
+        torch.nn.init.xavier_normal_(self.conv2.weight)
+
     def forward(self, x):
         _, out, _ = gutil.group(x, None, self.k) # (batch_size, num_dim(3), k, num_points)
 
@@ -48,6 +55,16 @@ class ResGraphConvUnpool(nn.Module):
         self.unpool_center_conv = nn.Conv2d(dim, 6, 1, 1)
         self.unpool_neighbor_conv = nn.Conv2d(dim, 6, 1, 1)
 
+        self.init_layer()
+
+    def init_layer(self):
+        for i in range(self.num_blocks):
+            torch.nn.init.xavier_uniform_(self.layers[4 * i + 2].weight)
+            torch.nn.init.xavier_uniform_(self.layers[4 * i + 3].weight)
+
+        torch.nn.init.xavier_uniform_(self.unpool_center_conv.weight)
+        torch.nn.init.xavier_uniform_(self.unpool_neighbor_conv.weight)
+
     def forward(self, xyz, points):
         # xyz: (batch_size, num_dim(3), num_points)
         # points: (batch_size, num_dim(128), num_points)
@@ -79,6 +96,8 @@ class ResGraphConvUnpool(nn.Module):
                 points_xyz = self.unpool_center_conv(center_points) # (batch_size, 3*up_ratio, 1, num_points)
                 # Neighbor Conv
                 grouped_points_xyz = self.unpool_neighbor_conv(grouped_points) # (batch_size, 3*up_ratio, k, num_points)
+
+                # old_ver
                 # CNN
                 new_xyz = torch.mean(torch.cat((points_xyz, grouped_points_xyz), dim=2), dim=2) # (batch_size, 3*up_ratio, num_points)
                 new_xyz = new_xyz.view(-1, 3, 2, num_points) # (batch_size, 3, up_ratio, num_points)
@@ -86,6 +105,14 @@ class ResGraphConvUnpool(nn.Module):
                 b, d, n = xyz.shape
                 new_xyz = new_xyz + xyz.view(b, d, 1, n).repeat(1, 1, 2, 1) # add delta x to original xyz to upsample
                 new_xyz = new_xyz.view(-1, 3, 2*num_points)
+
+                # ver2
+                # new_xyz = torch.mean(torch.cat((points_xyz, grouped_points_xyz), dim=2), dim=2)
+                # new_xyz = new_xyz.view(-1, 3, 2, num_points)
+                #
+                # b, d, n = xyz.shape
+                # new_xyz = new_xyz + xyz.view(b, d, 1, n).repeat(1, 1, 2, 1)  # add delta x to original xyz to upsample
+                # new_xyz = new_xyz.view(-1, 3, 2 * num_points)
 
                 return new_xyz, points
 

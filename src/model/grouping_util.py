@@ -6,15 +6,15 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 # TODO: consider https://github.com/krrish94/chamferdist
 
-def pairwise_dist(xyz1, xyz2):
-    xyz1 = xyz1.transpose(1,2)
-    xyz2 = xyz2.transpose(1, 2)
+def pairwise_dist(gt, pred):
+    gt = gt.transpose(1, 2)
+    pred = pred.transpose(1, 2)
 
-    r_xyz1 = torch.sum(xyz1 * xyz1, dim=2, keepdim=True)  # (B,N,1)
-    r_xyz2 = torch.sum(xyz2 * xyz2, dim=2, keepdim=True)  # (B,M,1)
-    mul = torch.matmul(xyz2, xyz1.permute(0,2,1))         # (B,M,N) (matmul (b,m,1)x(b,1,n)
-    dist, _ = torch.min(r_xyz2 - 2 * mul + r_xyz1.permute(0,2,1),dim=1)       # (B,M,N)
-    return dist
+    r_xyz1 = torch.sum(gt * gt, dim=2, keepdim=True)  # (B,N,1)
+    r_xyz2 = torch.sum(pred * pred, dim=2, keepdim=True)  # (B,M,1)
+    mul = torch.matmul(pred, gt.permute(0, 2, 1))         # (B,M,N) (matmul (b,m,1)x(b,1,n)
+    dist, _ = torch.min(r_xyz2 - 2 * mul + r_xyz1.permute(0,2,1),dim=2)       # (B,M)
+    return dist # using squared dist, based on original impl
 
 def knn_point(k, xyz1, xyz2):
     b1, d1, n1 = xyz1.shape
@@ -50,7 +50,8 @@ def group_point(x, idx):
     return feature
 
 def group(xyz, points, k):
-    _, idx = knn_point(k, xyz, xyz)
+    _, idx = knn_point(k+1, xyz, xyz)
+    idx = idx[:,1:,:] # exclude self matching
     grouped_xyz = group_point(xyz, idx) # (batch_size, num_dim, k, num_points)
     b,d,n = xyz.shape
     grouped_xyz -= xyz.unsqueeze(2).expand(-1,-1,k,-1) # translation normalization, (batch_size, num_points, k, num_dim(3))
@@ -116,12 +117,17 @@ def pool(xyz, points, k, npoint):
     return new_xyz, new_points
 
 if __name__ == '__main__':
-    x = torch.rand((24, 3, 4096)).to(torch.device('cuda'))
-    y = torch.rand((24, 3, 4096)).to(torch.device('cuda'))
-
-    new_xyz, new_points = pool(x,y,8,1024)
+    # x = torch.rand((24, 3, 4096)).to(torch.device('cuda'))
+    # y = torch.rand((24, 3, 4096)).to(torch.device('cuda'))
+    #
+    # new_xyz, new_points = pool(x,y,8,1024)
     # ind = knn_point(8,x,x)
 
-    # pairwise_dist(x,y)
+
+    gt = torch.rand((1,3,2))
+    pred = torch.rand((1,3,3))
+    val = pairwise_dist(gt, pred)
+
+    print(val.shape)
 
 

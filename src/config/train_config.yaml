@@ -32,7 +32,7 @@ lr: 0.001
 finetune_lr: 0.0001
 momentum: 0.9
 weight_decay: 0.00001
-batch_size: 10
+batch_size: 20
 max_epoch: 120
 pretrain_epoch: 80 # train generator only until this epoch
 save_steps: 10

@@ -8,7 +8,7 @@ dataset:
   data_augmentation: true
 
 # result
-ckpt_root: '../ckpt/Generator_Only'
+ckpt_root: '../ckpt/AR_GCN'
 
 # Network
 network:
@@ -26,13 +26,13 @@ loss:
 
 # train
 seed: 0
+phase: 'pre' #pre/gan
 optimizer: 'adam' # adam
 lr: 0.001
 momentum: 0.9
 weight_decay: 0.00001
-batch_size: 10
+batch_size: 16
 max_epoch: 80
-pretrain_epoch: 80 # train generator only until this epoch
 save_steps: 10
 
 #scheduler: 'cos' # step/cos
