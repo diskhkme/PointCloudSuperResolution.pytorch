@@ -58,8 +58,11 @@ class PUNetDataset(data.Dataset):
         return name_dict
 
     def __getitem__(self, idx):
-        choice = np.random.choice(self.input_data.shape[1], self.npoints, replace=True)
-        batch_input_data = np.expand_dims(self.input_data[idx, choice, :].copy(),0)
+        # choice = np.random.choice(self.input_data.shape[1], self.npoints, replace=True)
+        # batch_input_data = np.expand_dims(self.input_data[idx, choice, :].copy(),0)
+        point_idx = self.nonuniform_sampling(self.input_data.shape[1], self.npoints)
+        batch_input_data = np.expand_dims(self.input_data[idx,point_idx,:].copy(),0)
+
         batch_label_data = self.name_dict[self.get_name_from_name_path(self.names[idx])]
         batch_data_gt = np.expand_dims(self.gt[idx,:,:].copy(),0)
         radius = self.radius[idx]
@@ -89,6 +92,16 @@ class PUNetDataset(data.Dataset):
 
     # Data augmentation is directly copied from official implementation
     # https://github.com/wuhuikai/PointCloudSuperResolution/blob/master/code/data_provider.py
+
+    def nonuniform_sampling(self, num=4096, sample_num=1024):
+        sample = set()
+        loc = np.random.rand() * 0.8 + 0.1
+        while len(sample) < sample_num:
+            a = int(np.random.normal(loc=loc, scale=0.3) * num)
+            if a < 0 or a >= num:
+                continue
+            sample.add(a)
+        return list(sample)
 
     def rotate_point_cloud_and_gt(self, batch_data, batch_gt=None):
         """ Randomly rotate the point clouds to augument the dataset
@@ -199,6 +212,7 @@ class PUNetDataset(data.Dataset):
 
     def __len__(self):
         return len(self.input_data)
+        # return 30
 
 if __name__ == '__main__':
     path = '../../data/Patches_noHole_and_collected.h5'

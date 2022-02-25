@@ -16,13 +16,6 @@ class FeatureNet(nn.Module):
         self.bn2 = nn.BatchNorm2d(dim)
         self.bn3 = nn.BatchNorm2d(dim)
 
-        self.init_layer()
-
-    def init_layer(self):
-        torch.nn.init.xavier_normal_(self.conv1.weight)
-        torch.nn.init.xavier_normal_(self.conv2.weight)
-        torch.nn.init.xavier_normal_(self.conv2.weight)
-
     def forward(self, x):
         _, out, _ = gutil.group(x, None, self.k) # (batch_size, num_dim(3), k, num_points)
 
@@ -54,16 +47,6 @@ class ResGraphConvUnpool(nn.Module):
 
         self.unpool_center_conv = nn.Conv2d(dim, 6, 1, 1)
         self.unpool_neighbor_conv = nn.Conv2d(dim, 6, 1, 1)
-
-        self.init_layer()
-
-    def init_layer(self):
-        for i in range(self.num_blocks):
-            torch.nn.init.xavier_uniform_(self.layers[4 * i + 2].weight)
-            torch.nn.init.xavier_uniform_(self.layers[4 * i + 3].weight)
-
-        torch.nn.init.xavier_uniform_(self.unpool_center_conv.weight)
-        torch.nn.init.xavier_uniform_(self.unpool_neighbor_conv.weight)
 
     def forward(self, xyz, points):
         # xyz: (batch_size, num_dim(3), num_points)

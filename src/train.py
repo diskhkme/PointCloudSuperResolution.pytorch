@@ -38,9 +38,9 @@ class PointCloudSuperResolutionTrainer:
 
     def init_optimizer(self):
         if self.cfg['optimizer'] == 'adam': # TODO: support other optimizer option
-            pre_gen_optim = optim.Adam(self.generator.parameters(), lr=self.cfg['lr'], weight_decay=self.cfg['weight_decay'])
+            pre_gen_optim = optim.Adam(self.generator.parameters(), lr=self.cfg['lr'], betas=(0.5, 0.999), weight_decay=self.cfg['weight_decay'])
             # TODO: split discriminator optimizer parameter
-            d_optim = optim.Adam(self.discriminator.parameters(), lr=self.cfg['lr'], weight_decay=self.cfg['weight_decay'])
+            d_optim = optim.Adam(self.discriminator.parameters(), lr=self.cfg['lr'], betas=(0.9, 0.999), weight_decay=self.cfg['weight_decay'])
 
         return pre_gen_optim, d_optim
 

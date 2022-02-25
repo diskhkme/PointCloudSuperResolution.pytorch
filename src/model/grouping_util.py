@@ -13,8 +13,11 @@ def pairwise_dist(gt, pred):
     r_xyz1 = torch.sum(gt * gt, dim=2, keepdim=True)  # (B,N,1)
     r_xyz2 = torch.sum(pred * pred, dim=2, keepdim=True)  # (B,M,1)
     mul = torch.matmul(pred, gt.permute(0, 2, 1))         # (B,M,N) (matmul (b,m,1)x(b,1,n)
-    dist, _ = torch.min(r_xyz2 - 2 * mul + r_xyz1.permute(0,2,1),dim=2)       # (B,M)
+    dist, _ = torch.min(r_xyz2 - 2 * mul + r_xyz1.permute(0,2,1),dim=1)       # (B,M)
     return dist # using squared dist, based on original impl
+
+    # dist, _ = knn_point(1, gt, pred)
+    # return dist
 
 def knn_point(k, xyz1, xyz2):
     b1, d1, n1 = xyz1.shape
@@ -26,7 +29,7 @@ def knn_point(k, xyz1, xyz2):
     val, idx = torch.topk(-dist, k=k, dim=2)
     idx = idx.transpose(1, 2).contiguous()
 
-    return torch.sqrt(-val), idx  # TODO: remove sqrt
+    return -val, idx  # TODO: remove sqrt
 
 def group_point(x, idx):
     k = idx.size(1)
@@ -124,10 +127,10 @@ if __name__ == '__main__':
     # ind = knn_point(8,x,x)
 
 
-    gt = torch.rand((1,3,2))
-    pred = torch.rand((1,3,3))
-    val = pairwise_dist(gt, pred)
+    gt = torch.rand(20,3,4096)
+    pred = torch.rand(20, 3, 1024)
+    val = pairwise_dist(gt,pred)
 
-    print(val.shape)
+    print(val.item())
 
 
