@@ -30,9 +30,10 @@ class ResGraphConvPool(nn.Module):
         # points: (batch_size, num_dim(128), num_points)
 
         indices = None
-        for idx in range(12): # 4 layers per iter
+        for idx in range(4):
             shortcut = points # (batch_size, num_dim(128), num_points)
 
+            # 4 layers per iter
             points = self.layers[4 * idx](points) # Batch norm
             points = self.layers[4 * idx + 1](points) # LeakyReLU
 
@@ -46,7 +47,7 @@ class ResGraphConvPool(nn.Module):
             center_points = points.view(b, d, 1, n)
             points = self.layers[4 * idx + 2](center_points)  # (batch_size, num_dim(128), 1, num_points)
             # Neighbor Conv
-            grouped_points_nn = self.layers[4 * idx + 2](grouped_points)
+            grouped_points_nn = self.layers[4 * idx + 3](grouped_points)
             # CNN
             points = torch.mean(torch.cat((points, grouped_points_nn), dim=2), dim=2) + shortcut
 

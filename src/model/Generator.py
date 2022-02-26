@@ -115,7 +115,7 @@ class Generator(nn.Module):
 
         new_xyz, points = self.res_unpool_1(xyz, points)
 
-        _, idx = gutil.knn_point(self.k, xyz, new_xyz)  # idx contains k nearest point of new_xyz in xyz
+        _, idx = gutil.knn_point(self.k, new_xyz, xyz)  # idx contains k nearest point of new_xyz in xyz
         grouped_points = gutil.group_point(points, idx)
         points = torch.mean(grouped_points, dim=2)
 

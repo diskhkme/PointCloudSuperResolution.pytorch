@@ -6,7 +6,7 @@ import torch.nn as nn
 import numpy as np
 import cv2
 from sklearn.neighbors import NearestNeighbors
-from pyemd import emd_samples
+# from pyemd import emd_samples
 
 from config.config import get_test_config
 from model.Generator import Generator
@@ -71,13 +71,14 @@ class PointCloudSuperResolutionEvaluation:
         gt2pre, _ = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(pre_points).kneighbors(gt_points)
         pre2gt, _ = NearestNeighbors(n_neighbors=1, algorithm='auto').fit(gt_points).kneighbors(pre_points)
 
-        return np.squeeze(gt2pre), np.squeeze(pre2gt), emd_samples(gt_points, pre_points)
+        return np.squeeze(gt2pre), np.squeeze(pre2gt) #, emd_samples(gt_points, pre_points)
 
     def evaluate(self, filename_list, gt_filename_list):
         filename_list = [x for x in filename_list if x.find('.xyz') != -1]
         gt_filename_list = [x for x in gt_filename_list if x.find('.xyz') != -1]
         distances = map(self.evaluate_single, filename_list, gt_filename_list)
-        gt2pre, pre2gt, emd = zip(*distances)
+        #gt2pre, pre2gt, emd = zip(*distances) # Something wrong with pyemd in pytorch3d env
+        gt2pre, pre2gt = zip(*distances)
         gt2pre, pre2gt = np.hstack(gt2pre), np.hstack(pre2gt)
         print('GT  --> PRE')
         print('\tMean     : {}'.format(np.mean(gt2pre)))
@@ -95,7 +96,7 @@ class PointCloudSuperResolutionEvaluation:
         print('\t{}'.format(2 / (1 / np.mean(gt2pre <= 1e-2) + 1 / np.mean(pre2gt <= 1e-2))))
         print('\t{}'.format(2 / (1 / np.mean(gt2pre <= 2e-2) + 1 / np.mean(pre2gt <= 2e-2))))
         print('EMD:')
-        print('\t{}'.format(np.mean(emd)))
+        # print('\t{}'.format(np.mean(emd)))
 
     def save_xyz(self, path, points):
         if not os.path.exists(os.path.split(path)[0]):

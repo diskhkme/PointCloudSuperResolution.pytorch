@@ -72,8 +72,6 @@ class PointCloudSuperResolutionTrainer:
         self.generator.train()
         if phase == 'gan':
             self.discriminator.train()
-            for g in self.pre_gen_optim.param_groups:
-                g['lr'] = self.cfg['finetune_lr']
 
         for i, (input, label, gt) in enumerate(tqdm(train_dl)):
             # torch.cuda.empty_cache()
@@ -98,6 +96,7 @@ class PointCloudSuperResolutionTrainer:
 
             if phase == 'gan':
                 d_loss = get_d_loss(d_real, d_fake)
+
                 self.d_optim.zero_grad()
                 d_loss.backward()
                 self.d_optim.step()
@@ -105,8 +104,9 @@ class PointCloudSuperResolutionTrainer:
                 d_loss_train += d_loss.item()
 
             pre_gen_loss = cd_loss
+
             if phase == 'gan':
-                d_fake = self.discriminator(pred_points)
+                d_fake = self.discriminator(pred_points) # it takes too much time,
                 # torch.cuda.empty_cache()
                 g_loss = get_g_loss(d_fake)
                 pre_gen_loss = g_loss + self.cfg['loss']['lambd'] * pre_gen_loss
@@ -148,5 +148,5 @@ class PointCloudSuperResolutionTrainer:
                torch.save(self.generator.state_dict(), os.path.join(self.cfg['ckpt_root'], '{}_result_{}_{:.6f}.pt'.format(self.cfg['phase'], epoch, train_loss)))
 
 if __name__ == '__main__':
-    PointCloudSuperResolutionTrainer('config/train_config_gen_only.yaml').main()
     # PointCloudSuperResolutionTrainer('config/train_config_gen_only.yaml').main()
+    PointCloudSuperResolutionTrainer('config/train_config_gan.yaml').main()

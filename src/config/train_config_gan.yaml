@@ -26,13 +26,14 @@ loss:
 
 # train
 seed: 0
-phase: 'pre' #pre/gan
+phase: 'gan' #pre/gan
+pre_weight: '../ckpt/AR_GCN/pre_result_80_0.000353.pt'
 optimizer: 'adam' # adam
-lr: 0.001
+lr: 0.0001
 momentum: 0.9
 weight_decay: 0.00001
-batch_size: 24
-max_epoch: 80
+batch_size: 16
+max_epoch: 40
 save_steps: 10
 
 #scheduler: 'cos' # step/cos
