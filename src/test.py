@@ -128,5 +128,5 @@ class PointCloudSuperResolutionEvaluation:
         self.write_prdicted_images(input_filename_list, gt_filename_list)
 
 if __name__ == '__main__':
-    PointCloudSuperResolutionEvaluation('config/test_config.yaml').main()
+    PointCloudSuperResolutionEvaluation(sys.argv[1]).main()
 

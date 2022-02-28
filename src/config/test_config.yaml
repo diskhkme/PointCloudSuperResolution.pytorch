@@ -16,6 +16,8 @@ network:
 dataset:
   input_dir: '../data/input'
   gt_dir: '../data/gt'
-  pred_dir: '../data/pred'
+  pred_dir: '../data/pred_Res_GCN'
+#  pred_dir: '../data/pred_AR_GCN'
 
 load_model: '../ckpt/AR_GCN/pre_result_80_0.000353.pt'
+#load_model: '../ckpt/AR_GCN/gan_result_40_3.087515.pt'

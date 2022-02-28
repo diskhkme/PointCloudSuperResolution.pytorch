@@ -10,7 +10,7 @@ def _check_dir(dir, make_dir=True):
         else:
             raise Exception('Directory not exist {}'.format(dir))
 
-def get_train_config(config_file='config/train_config.yaml'):
+def get_train_config(config_file='config/train_config_res_gcn.yaml'):
     with open(config_file, 'r') as f:
         cfg = yaml.load(f, Loader=yaml.loader.SafeLoader)
 
@@ -26,6 +26,6 @@ def get_test_config(config_file='config/test_config.yaml'):
     return cfg
 
 if __name__ == '__main__':
-    cfg = get_train_config('train_config.yaml')
+    cfg = get_train_config('train_config_res_gcn.yaml')
     print(cfg['dataset'])
     print(cfg['augment_data'])

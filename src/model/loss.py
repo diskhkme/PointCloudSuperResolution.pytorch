@@ -9,18 +9,6 @@ def get_cd_loss(pred, gt, radius, alpha=1.0): # author proposed using alpha==1.0
 
     return forward
 
-    # forward = gutil.pairwise_dist(gt, pred) # for points in pred, get nearest point index in gt
-    # if alpha != 1.0:
-    #     backward = gutil.pairwise_dist(pred, gt)
-    # else:
-    #     backward = 0
-    #
-    # cd_dist = alpha*forward + (1.0-alpha)*backward
-    # cd_dist = torch.mean(cd_dist, dim=1)
-    # cd_dist_norm = cd_dist / radius
-    # cd_loss = torch.mean(cd_dist_norm, dim=0) # batch dim
-
-    # return cd_loss
 
 def get_d_loss(d_real, d_fake):
     d_loss_real = torch.mean((d_real - 1)**2, dim=2)
