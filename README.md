@@ -2,14 +2,14 @@
 
 This repository is implementation of AR-GCN(https://arxiv.org/abs/1908.02111) from "Point Cloud Super Resolution with Adversarial Residual Graph Networks" in Pytorch. You can find official Tensorflow implementation [here](https://github.com/wuhuikai/PointCloudSuperResolution).
 
-The model is in `src/model/Generator.py` & `src/model/Discriminator.py`
-
-For further reduce training time, you can borrow CUDA implementation of KNN & Farthest point sampling from such as [PYG](https://github.com/pyg-team/pytorch_geometric)
+The model implementations are in `src/model`
 
 ## Note
 
 The code is tested under Pytorch 1.9.0 and Python 3.8 on Ubuntu 18.04 LTS.
-We use [pytorch3d](https://pytorch3d.org/) operation & loss functions for k-nn & cd_loss calculation.
+
+We used [pytorch3d](https://pytorch3d.org/) operation & loss functions for k-nn & cd_loss calculation.
+
 Note that to enable non-symmetric chamfer distance calculation (only forward is used), 
 we modified `pytorch3d/loss/chamfer.py` like below.
 
