@@ -20,7 +20,7 @@ class PointCloudSuperResolutionTrainer:
 
         self.generator = self.init_generator()
         self.discriminator = self.init_discriminator()
-        self.pre_gen_optim, self.d_optim = self.init_optimizer()
+        self.pre_gen_optim, self.d_optim, self.pre_gen_scheduler, self.d_scheduler = self.init_optimizer()
 
     def init_generator(self):
         model = Generator(self.cfg['network']['generator'])
@@ -38,11 +38,21 @@ class PointCloudSuperResolutionTrainer:
 
     def init_optimizer(self):
         if self.cfg['optimizer'] == 'adam': # TODO: support other optimizer option
-            pre_gen_optim = optim.Adam(self.generator.parameters(), lr=self.cfg['lr'], betas=(0.5, 0.999), weight_decay=self.cfg['weight_decay'])
-            # TODO: split discriminator optimizer parameter
-            d_optim = optim.Adam(self.discriminator.parameters(), lr=self.cfg['lr'], betas=(0.9, 0.999), weight_decay=self.cfg['weight_decay'])
+            if self.cfg['phase'] == 'gan':
+                pre_gen_optim = optim.Adam(self.generator.parameters(), lr=self.cfg['lr']/10, betas=(0.9, 0.999), weight_decay=self.cfg['weight_decay'])
+                d_optim = optim.Adam(self.discriminator.parameters(), lr=self.cfg['lr'], betas=(0.5, 0.999), weight_decay=self.cfg['weight_decay'])
+            else:
+                pre_gen_optim = optim.Adam(self.generator.parameters(), lr=self.cfg['lr'], betas=(0.9, 0.999),
+                                           weight_decay=self.cfg['weight_decay'])
+                d_optim = None
 
-        return pre_gen_optim, d_optim
+        pre_gen_scheduler = optim.lr_scheduler.MultiStepLR(pre_gen_optim, milestones=[5, 10, 50], gamma=0.5)
+        if self.cfg['phase'] == 'gan':
+            d_scheduler = optim.lr_scheduler.MultiStepLR(d_optim, milestones=[5, 10, 20], gamma=0.5)
+        else:
+            d_scheduler = None
+
+        return pre_gen_optim, d_optim, pre_gen_scheduler, d_scheduler
 
     def init_dataloader(self):
         dataset = PUNetDataset(self.cfg['dataset']['data_path'], npoints=self.cfg['dataset']['in_point'], data_augmentation=self.cfg['dataset']['data_augmentation'])
@@ -128,7 +138,11 @@ class PointCloudSuperResolutionTrainer:
                 pre_gen_loss_train += pre_gen_loss.item()
 
                 # print mini-batch loss for debug
-                # print('Batch loss total(=cd_loss): {:.6f}'.format(pre_gen_loss.item()))
+                print('Batch loss total(=cd_loss): {:.6f}'.format(pre_gen_loss.item()))
+
+        self.pre_gen_scheduler.step()
+        if phase == 'gan':
+            self.d_scheduler.step()
 
         return pre_gen_loss_train / num_batch, cd_loss_train / num_batch, g_loss_train / num_batch, d_loss_train / num_batch
 
