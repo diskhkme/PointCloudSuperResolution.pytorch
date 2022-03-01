@@ -1,4 +1,5 @@
 # -- in addition
+ckpt/
 data/
 .idea/
 gt/

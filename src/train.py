@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.optim as optim
 import datetime
 from tqdm import tqdm
+import logging
 
 from config.config import get_train_config
 from model.Generator import Generator
@@ -15,6 +16,7 @@ from dataset.pu_net_hdf import PUNetDataset
 
 class PointCloudSuperResolutionTrainer:
     def __init__(self, config_path):
+        self.config_path = config_path
         self.cfg = get_train_config(config_path)
         os.environ['CUDA_VISIBLE_DEVICES'] = self.cfg['cuda_devices']
 
@@ -122,7 +124,7 @@ class PointCloudSuperResolutionTrainer:
                 self.pre_gen_optim.step()
 
                 # print mini-batch loss for debug
-                print('Batch loss total: {:.6f} (cd_loss:{:.6f} g_loss:{:.6f} d_loss:{:.6f})'.format(
+                logging.info('Batch loss total: {:.6f} (cd_loss:{:.6f} g_loss:{:.6f} d_loss:{:.6f})'.format(
                     pre_gen_loss.item(), cd_loss.item(), g_loss.item(), d_loss.item()))
 
             if phase != 'gan':
@@ -138,7 +140,7 @@ class PointCloudSuperResolutionTrainer:
                 pre_gen_loss_train += pre_gen_loss.item()
 
                 # print mini-batch loss for debug
-                print('Batch loss total(=cd_loss): {:.6f}'.format(pre_gen_loss.item()))
+                logging.info('Batch loss total(=cd_loss): {:.6f}'.format(pre_gen_loss.item()))
 
         self.pre_gen_scheduler.step()
         if phase == 'gan':
@@ -147,10 +149,22 @@ class PointCloudSuperResolutionTrainer:
         return pre_gen_loss_train / num_batch, cd_loss_train / num_batch, g_loss_train / num_batch, d_loss_train / num_batch
 
     def main(self):
-        print('Starting {}, {}'.format(type(self).__name__, self.cfg))
+        # copy train cfg to ckpt folder
+        os.system('cp {} {}'.format(self.config_path, self.cfg['ckpt_root']))
+
+        # logging
+        log_file = os.path.join(self.cfg['ckpt_root'],'log_train.txt')
+        logging.basicConfig(level=logging.INFO,
+                            handlers=[
+                                logging.FileHandler(log_file,mode='w'),
+                                logging.StreamHandler()
+                            ]
+                            )
+
+        logging.info('Starting {}, {}'.format(type(self).__name__, self.cfg))
         train_dl = self.init_dataloader()
         current_phase = self.cfg['phase']
-        print(current_phase)
+        logging.info(current_phase)
 
         if current_phase == 'gan':
             assert os.path.exists(self.cfg['pre_weight'])
@@ -159,10 +173,10 @@ class PointCloudSuperResolutionTrainer:
         for epoch in range(1,self.cfg['max_epoch'] + 1):
             if current_phase == 'pre':
                 train_loss, _, _, _ = self.do_train(train_dl, 'pre')
-                print('{} Epoch {}, Total loss {:.6f}'.format(datetime.datetime.now(), epoch, train_loss))
+                logging.info('{} Epoch {}, Total loss {:.6f}'.format(datetime.datetime.now(), epoch, train_loss))
             elif current_phase == 'gan':
                 train_loss, cd_loss, g_loss, d_loss = self.do_train(train_dl, phase='gan')
-                print('{} Epoch {}, Total loss {:.6f}, CD loss: {:.6f}, G Loss {:.6f}, D Loss {:.6f}'.format(datetime.datetime.now(),
+                logging.info('{} Epoch {}, Total loss {:.6f}, CD loss: {:.6f}, G Loss {:.6f}, D Loss {:.6f}'.format(datetime.datetime.now(),
                                                                                                epoch, train_loss, cd_loss,
                                                                                                g_loss, d_loss))
 
