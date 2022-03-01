@@ -65,7 +65,8 @@ class PointCloudSuperResolutionTrainer:
 
         loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                                    pin_memory=True,
-                                                   shuffle=True)
+                                                   shuffle=True,
+                                             num_workers = torch.cuda.device_count() * 4)
 
         return loader
 
@@ -92,7 +93,7 @@ class PointCloudSuperResolutionTrainer:
             gt_points = gt.cuda()
             gt_points = self.clip_gt_points(input_points.size(2)*4, gt_points) # 4=upsample ratio
 
-            torch.autograd.set_detect_anomaly(True)
+            # torch.autograd.set_detect_anomaly(True)
 
             if phase == 'gan':
                 #--------Train discriminator--------#

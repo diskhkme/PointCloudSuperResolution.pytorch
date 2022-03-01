@@ -8,20 +8,16 @@ class FeatureNet(nn.Module):
         super(FeatureNet, self).__init__()
         self.k = k
 
-        self.conv1 = nn.Conv2d(3, dim, 1, 1)
-        self.conv2 = nn.Conv2d(dim, dim, 1, 1)
-        self.conv3 = nn.Conv2d(dim, dim, 1, 1)
-
-        self.bn1 = nn.BatchNorm2d(dim)
-        self.bn2 = nn.BatchNorm2d(dim)
-        self.bn3 = nn.BatchNorm2d(dim)
+        self.conv1 = nn.Conv2d(3, dim, 1, 1 ,bias=False)
+        self.conv2 = nn.Conv2d(dim, dim, 1, 1,bias=False)
+        self.conv3 = nn.Conv2d(dim, dim, 1, 1,bias=False)
 
     def forward(self, x):
         _, out, _ = gutil.group(x, None, self.k) # (batch_size, num_dim(3), k, num_points)
 
-        out = F.relu(self.bn1(self.conv1(out))) # (batch_size, num_dim, k, num_points)
-        out = F.relu(self.bn2(self.conv2(out))) # (batch_size, num_dim, k, num_points)
-        out = F.relu(self.bn3(self.conv3(out))) # (batch_size, num_dim, k, num_points)
+        out = F.relu(self.conv1(out))  # (batch_size, num_dim, k, num_points)
+        out = F.relu(self.conv2(out))  # (batch_size, num_dim, k, num_points)
+        out = F.relu(self.conv3(out))  # (batch_size, num_dim, k, num_points)
 
         out, _ = torch.max(out, dim=2) # (batch_size, num_dim, num_points)
 
@@ -33,20 +29,17 @@ class ResGraphConvUnpool(nn.Module):
         self.k = k
         self.num_blocks = 12
 
-        self.layers = nn.ModuleList()
+        self.bn_relu_layers = nn.ModuleList()
         for i in range(self.num_blocks):
-            if i == 1:
-                self.layers.append(nn.BatchNorm1d(in_dim))
-            else:
-                self.layers.append(nn.BatchNorm1d(dim))
+            self.bn_relu_layers.append(nn.ReLU())
 
-            self.layers.append(nn.ReLU())
+        self.conv_layers = nn.ModuleList()
+        for i in range(self.num_blocks):
+            self.conv_layers.append(nn.Conv2d(in_dim, dim, 1, 1,bias=False))
+            self.conv_layers.append(nn.Conv2d(dim, dim, 1, 1,bias=False))
 
-            self.layers.append(nn.Conv2d(in_dim, dim, 1, 1))
-            self.layers.append(nn.Conv2d(dim, dim, 1, 1))
-
-        self.unpool_center_conv = nn.Conv2d(dim, 6, 1, 1)
-        self.unpool_neighbor_conv = nn.Conv2d(dim, 6, 1, 1)
+        self.unpool_center_conv = nn.Conv2d(dim, 6, 1, 1,bias=False)
+        self.unpool_neighbor_conv = nn.Conv2d(dim, 6, 1, 1,bias=False)
 
     def forward(self, xyz, points):
         # xyz: (batch_size, num_dim(3), num_points)
@@ -56,8 +49,7 @@ class ResGraphConvUnpool(nn.Module):
         for idx in range(self.num_blocks): # 4 layers per iter
             shortcut = points # (batch_size, num_dim(128), num_points)
 
-            points = self.layers[4 * idx](points) # Batch norm
-            points = self.layers[4 * idx + 1](points) # ReLU
+            points = self.bn_relu_layers[idx](points) # ReLU
 
             if idx == 0 and indices is None:
                 _, grouped_points, indices = gutil.group(xyz, points, self.k) # (batch_size, num_dim, k, num_points)
@@ -67,9 +59,9 @@ class ResGraphConvUnpool(nn.Module):
             # Center Conv
             b,d,n = points.shape
             center_points = points.view(b, d, 1, n)
-            points = self.layers[4 * idx + 2](center_points)  # (batch_size, num_dim(128), 1, num_points)
+            points = self.conv_layers[2 * idx](center_points)  # (batch_size, num_dim(128), 1, num_points)
             # Neighbor Conv
-            grouped_points_nn = self.layers[4 * idx + 3](grouped_points)
+            grouped_points_nn = self.conv_layers[2 * idx + 1](grouped_points)
             # CNN
             points = torch.mean(torch.cat((points, grouped_points_nn), dim=2), dim=2) + shortcut
 
@@ -80,7 +72,6 @@ class ResGraphConvUnpool(nn.Module):
                 # Neighbor Conv
                 grouped_points_xyz = self.unpool_neighbor_conv(grouped_points) # (batch_size, 3*up_ratio, k, num_points)
 
-                # old_ver
                 # CNN
                 new_xyz = torch.mean(torch.cat((points_xyz, grouped_points_xyz), dim=2), dim=2) # (batch_size, 3*up_ratio, num_points)
                 new_xyz = new_xyz.view(-1, 3, 2, num_points) # (batch_size, 3, up_ratio, num_points)
@@ -88,14 +79,6 @@ class ResGraphConvUnpool(nn.Module):
                 b, d, n = xyz.shape
                 new_xyz = new_xyz + xyz.view(b, d, 1, n).repeat(1, 1, 2, 1) # add delta x to original xyz to upsample
                 new_xyz = new_xyz.view(-1, 3, 2*num_points)
-
-                # ver2
-                # new_xyz = torch.mean(torch.cat((points_xyz, grouped_points_xyz), dim=2), dim=2)
-                # new_xyz = new_xyz.view(-1, 3, 2, num_points)
-                #
-                # b, d, n = xyz.shape
-                # new_xyz = new_xyz + xyz.view(b, d, 1, n).repeat(1, 1, 2, 1)  # add delta x to original xyz to upsample
-                # new_xyz = new_xyz.view(-1, 3, 2 * num_points)
 
                 return new_xyz, points
 
