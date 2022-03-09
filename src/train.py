@@ -78,7 +78,7 @@ class PointCloudSuperResolutionTrainer:
 
     def do_train(self, train_dl, phase):
         num_batch = int(len(train_dl))
-        pre_gen_loss_train = 0.0
+        total_loss_train = 0.0
         cd_loss_train = 0.0
         d_loss_train = 0.0
         g_loss_train = 0.0
@@ -96,12 +96,19 @@ class PointCloudSuperResolutionTrainer:
             # torch.autograd.set_detect_anomaly(True)
 
             if phase == 'gan':
-                #--------Train discriminator--------#
-                d_real = self.discriminator(gt_points)
                 pred_points = self.generator(input_points)
+
+                #--------Train discriminator--------#
+                for p in self.discriminator.parameters():
+                    p.data.clamp_(-0.01, 0.01)
+
+                d_real = self.discriminator(gt_points)
                 d_fake = self.discriminator(pred_points.detach())
 
-                d_loss = get_d_loss(d_real, d_fake)
+                d_loss_real = torch.mean((d_real - 1) ** 2)
+                d_loss_fake = torch.mean(d_fake ** 2)
+                d_loss = 0.5 * (d_loss_real + d_loss_fake)
+
                 d_loss_train += d_loss.item()
 
                 self.d_optim.zero_grad()
@@ -109,36 +116,38 @@ class PointCloudSuperResolutionTrainer:
                 self.d_optim.step()
 
                 # --------Train generator--------#
-                d_gen_fake = self.discriminator(pred_points.detach()) # train only generator
+                d_gen_fake = self.discriminator(pred_points) # train only generator
+                g_loss = torch.mean((d_gen_fake - 1) ** 2)
+                cd_loss = get_cd_loss(gt_points, pred_points, 1.0)
 
-                cd_loss = get_cd_loss(pred_points, gt_points, 1.0)
-
-                g_loss = get_g_loss(d_gen_fake)
                 pre_gen_loss = g_loss + self.cfg['loss']['lambd'] * cd_loss
-
-                cd_loss_train += cd_loss.item()
-                pre_gen_loss_train += pre_gen_loss.item()
-                g_loss_train += g_loss.item()
 
                 self.pre_gen_optim.zero_grad()
                 pre_gen_loss.backward()
                 self.pre_gen_optim.step()
 
+                cd_loss_train += cd_loss.item()
+                total_loss_train += pre_gen_loss.item()
+                g_loss_train += g_loss.item()
+
+
                 # print mini-batch loss for debug
-                logging.info('Batch loss total: {:.6f} (cd_loss:{:.6f} g_loss:{:.6f} d_loss:{:.6f})'.format(
-                    pre_gen_loss.item(), cd_loss.item(), g_loss.item(), d_loss.item()))
+                logging.info('Batch loss total: {:.6f} (cd_loss:{:.6f} g_loss:{:.6f} d_loss:{:.6f} (d_loss_real:{:.6f}, d_loss_fake:{:.6f})'.format(
+                    pre_gen_loss.item(), cd_loss.item(), g_loss.item(), d_loss.item(), d_loss_real.item(), d_loss_fake.item()))
 
             if phase != 'gan':
                 pred_points = self.generator(input_points)
 
-                cd_loss = get_cd_loss(pred_points, gt_points, 1.0)
-                pre_gen_loss = cd_loss
+                cd_loss = get_cd_loss(gt_points, pred_points, 1.0)
 
                 self.pre_gen_optim.zero_grad()
-                pre_gen_loss.backward()
+                cd_loss.backward()
                 self.pre_gen_optim.step()
 
-                pre_gen_loss_train += pre_gen_loss.item()
+                cd_loss_train += cd_loss.item()
+
+                pre_gen_loss = cd_loss
+                total_loss_train += pre_gen_loss.item()
 
                 # print mini-batch loss for debug
                 logging.info('Batch loss total(=cd_loss): {:.6f}'.format(pre_gen_loss.item()))
@@ -147,34 +156,36 @@ class PointCloudSuperResolutionTrainer:
         if phase == 'gan':
             self.d_scheduler.step()
 
-        return pre_gen_loss_train / num_batch, cd_loss_train / num_batch, g_loss_train / num_batch, d_loss_train / num_batch
+        return total_loss_train / num_batch, cd_loss_train / num_batch, g_loss_train / num_batch, d_loss_train / num_batch
 
     def main(self):
         # copy train cfg to ckpt folder
         os.system('cp {} {}'.format(self.config_path, self.cfg['ckpt_root']))
 
-        # logging
-        log_file = os.path.join(self.cfg['ckpt_root'],'log_train.txt')
-        logging.basicConfig(level=logging.INFO,
-                            handlers=[
-                                logging.FileHandler(log_file,mode='w'),
-                                logging.StreamHandler()
-                            ]
-                            )
 
-        logging.info('Starting {}, {}'.format(type(self).__name__, self.cfg))
+
+
         train_dl = self.init_dataloader()
         current_phase = self.cfg['phase']
-        logging.info(current_phase)
+
 
         if current_phase == 'gan':
             assert os.path.exists(self.cfg['pre_weight'])
             self.generator.load_state_dict(torch.load(self.cfg['pre_weight'], map_location=torch.device('cuda')))
+            # logging
+            log_file = os.path.join(self.cfg['ckpt_root'], 'log_train_ar_gan.txt')
+        else:
+            log_file = os.path.join(self.cfg['ckpt_root'], 'log_train_res_gcn.txt')
+
+        logging.basicConfig(level=logging.INFO,
+                            handlers=[logging.FileHandler(log_file, mode='w'), logging.StreamHandler()])
+        logging.info('Starting {}, {}'.format(type(self).__name__, self.cfg))
+        logging.info(current_phase)
 
         for epoch in range(1,self.cfg['max_epoch'] + 1):
             if current_phase == 'pre':
-                train_loss, _, _, _ = self.do_train(train_dl, 'pre')
-                logging.info('{} Epoch {}, Total loss {:.6f}'.format(datetime.datetime.now(), epoch, train_loss))
+                cd_loss, _, _, _ = self.do_train(train_dl, 'pre')
+                logging.info('{} Epoch {}, Total loss {:.6f}'.format(datetime.datetime.now(), epoch, cd_loss))
             elif current_phase == 'gan':
                 train_loss, cd_loss, g_loss, d_loss = self.do_train(train_dl, phase='gan')
                 logging.info('{} Epoch {}, Total loss {:.6f}, CD loss: {:.6f}, G Loss {:.6f}, D Loss {:.6f}'.format(datetime.datetime.now(),
@@ -182,7 +193,7 @@ class PointCloudSuperResolutionTrainer:
                                                                                                g_loss, d_loss))
 
             if epoch == 1 or epoch % self.cfg['save_steps'] == 0:
-               torch.save(self.generator.state_dict(), os.path.join(self.cfg['ckpt_root'], '{}_result_{}_{:.6f}.pt'.format(self.cfg['phase'], epoch, train_loss)))
+               torch.save(self.generator.state_dict(), os.path.join(self.cfg['ckpt_root'], '{}_result_{}_{:.6f}.pt'.format(self.cfg['phase'], epoch, cd_loss)))
 
 if __name__ == '__main__':
     PointCloudSuperResolutionTrainer(sys.argv[1]).main()

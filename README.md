@@ -45,10 +45,10 @@ python test.py # refer 'src/config/test_config.yaml' for test settings
 
 ## Performance
 
-|       |   CD   | F-Score |
-|------:|:------:|:-------:|
-| ResGCN| 0.0120 | 0.3997  |
-| AR-GCN| 0.0110 | 0.4573  |
+|         |   CD   | F-Score |
+|--------:|:------:|:-------:|
+| Res-GCN | 0.0092 | 0.6349  |
+|  AR-GCN | 0.0090 | 0.6470  |
 
 ### Prediction example
 
@@ -56,12 +56,14 @@ python test.py # refer 'src/config/test_config.yaml' for test settings
 ![GT](./img/camel_gt.jpg)
 - Input
 ![Input](./img/camel_input.jpg)
-- Prediction
-![Pred](./img/camel_pred.jpg)
+- Prediction (Res-GCN)
+![Pred](./img/camel_pred_res_gcn.jpg)
+- Prediction (AR-GCN)
+![Pred](./img/camel_pred_ar_gcn.jpg)
 
 ## Issues
-- Training GAN takes too much time(~7s/it) compare to the author's implementation(~1s/it)
-- Performance is relatively low compared to the author's implementation
+- (fixed) ~~Training GAN takes too much time(~7s/it) compare to the author's implementation(~1s/it)~~
+- (partially fixed) Performance is relatively low compared to the author's implementation. Especially during GAN training phase, discriminator does not trained well compare to the author's implementation.  
 
 ### Contact
 hk.kim@jbnu.ac.kr

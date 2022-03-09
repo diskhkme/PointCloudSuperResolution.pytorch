@@ -2,7 +2,7 @@ import torch
 import model.grouping_util as gutil
 import pytorch3d.loss as p3_loss
 
-def get_cd_loss(pred, gt, radius, alpha=1.0): # author proposed using alpha==1.0
+def get_cd_loss(gt, pred, radius, alpha=1.0): # author proposed using alpha==1.0
     pred = pred.transpose(1,2)
     gt = gt.transpose(1,2)
     forward, _, _ = p3_loss.chamfer_distance(gt,pred) # default: mean/mean
@@ -18,7 +18,7 @@ def get_d_loss(d_real, d_fake):
     return d_loss
 
 def get_g_loss(d_fake):
-    g_loss = torch.mean(d_fake**2, dim=2)
+    g_loss = torch.mean((d_fake-1)**2, dim=2)
 
     return g_loss.mean()
 

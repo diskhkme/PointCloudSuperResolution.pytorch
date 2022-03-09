@@ -22,14 +22,14 @@ network:
     res_conv_dim: 64
 
 loss:
-  lambd: 5000
+  lambd: 5000.0
 
 # train
 seed: 0
 phase: 'gan' #pre/gan
-pre_weight: '../ckpt/AR_GCN/pre_result_80_0.000353.pt'
+pre_weight: '../ckpt/AR_GCN/pre_result_80_0.000410.pt'
 optimizer: 'adam' # adam
-lr: 0.0001
+lr: 0.001
 momentum: 0.9
 weight_decay: 0.00001
 batch_size: 12

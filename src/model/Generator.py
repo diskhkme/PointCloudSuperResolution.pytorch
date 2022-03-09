@@ -1,23 +1,30 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import model.grouping_util as gutil
+import model.grouping_util as gutil\
+
+def init_weight_(m):
+    if type(m) == nn.Conv2d:
+        torch.nn.init.xavier_uniform_(m.weight)
 
 class FeatureNet(nn.Module):
-    def __init__(self, k=8, dim=128):
+    def __init__(self, k=8, dim=128, num_block=3):
         super(FeatureNet, self).__init__()
         self.k = k
+        self.num_block = num_block
 
-        self.conv1 = nn.Conv2d(3, dim, 1, 1 ,bias=False)
-        self.conv2 = nn.Conv2d(dim, dim, 1, 1,bias=False)
-        self.conv3 = nn.Conv2d(dim, dim, 1, 1,bias=False)
+        self.conv_layers = nn.ModuleList()
+        self.conv_layers.append(nn.Conv2d(3, dim, 1, 1 ,bias=False))
+        for i in range(self.num_block - 1):
+            self.conv_layers.append(nn.Conv2d(dim, dim, 1, 1,bias=False))
+
+        self.conv_layers.apply(init_weight_)
 
     def forward(self, x):
         _, out, _ = gutil.group(x, None, self.k) # (batch_size, num_dim(3), k, num_points)
 
-        out = F.relu(self.conv1(out))  # (batch_size, num_dim, k, num_points)
-        out = F.relu(self.conv2(out))  # (batch_size, num_dim, k, num_points)
-        out = F.relu(self.conv3(out))  # (batch_size, num_dim, k, num_points)
+        for conv_layer in self.conv_layers:
+            out = F.relu(conv_layer(out))
 
         out, _ = torch.max(out, dim=2) # (batch_size, num_dim, num_points)
 
@@ -40,6 +47,10 @@ class ResGraphConvUnpool(nn.Module):
 
         self.unpool_center_conv = nn.Conv2d(dim, 6, 1, 1,bias=False)
         self.unpool_neighbor_conv = nn.Conv2d(dim, 6, 1, 1,bias=False)
+
+        self.conv_layers.apply(init_weight_)
+        self.unpool_center_conv.apply(init_weight_)
+        self.unpool_neighbor_conv.apply(init_weight_)
 
     def forward(self, xyz, points):
         # xyz: (batch_size, num_dim(3), num_points)
@@ -88,7 +99,7 @@ class Generator(nn.Module):
         self.k = cfg['k']
         self.feat_dim = cfg['feat_dim']
         self.res_conv_dim = cfg['res_conv_dim']
-        self.featurenet = FeatureNet(self.k, self.feat_dim)
+        self.featurenet = FeatureNet(self.k, self.feat_dim,3)
 
         self.res_unpool_1 = ResGraphConvUnpool(self.k, self.feat_dim, self.res_conv_dim)
         self.res_unpool_2 = ResGraphConvUnpool(self.k, self.res_conv_dim, self.res_conv_dim)
